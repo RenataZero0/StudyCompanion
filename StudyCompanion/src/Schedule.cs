@@ -94,6 +94,8 @@ namespace StudyCompanion
                         cands.Add(s.Substring("SchedulePath=".Length).Trim().Trim('"'));
                 }
             }
+            // 安装版：课表放在用户数据目录里，程序更新不会覆盖，用户也能自己改
+            cands.Add(Path.Combine(Store.Root, "Schedule.xlsx"));
             cands.Add(Path.Combine(exeDir, "Schedule.xlsx"));
             cands.Add(Path.Combine(Path.GetDirectoryName(exeDir.TrimEnd('\\')), "Schedule.xlsx"));
             cands.Add(@"D:\UsrFiles\Documents\NCUK IFY Self Study\Schedule.xlsx");

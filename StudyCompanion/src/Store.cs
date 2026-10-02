@@ -15,15 +15,75 @@ namespace StudyCompanion
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         const string AppName = "StudyCompanion";
 
+        /// <summary>
+        /// 数据根目录：%APPDATA%\StudyCompanion
+        ///
+        /// 以前是放在 exe 旁边的 data\ 里 —— 自己编译、绿色运行没问题，
+        /// 但装到 Program Files 之后那个目录是只读的，写不进去。
+        /// 所以要改成用户目录，并做一次从旧位置的搬迁。
+        /// </summary>
+        public static string Root
+        {
+            get
+            {
+                string d = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StudyCompanion");
+                Directory.CreateDirectory(d);
+                MigrateOnce(d);
+                return d;
+            }
+        }
+
+        static bool _migrated;
+
+        /// <summary>
+        /// 第一次在用户目录下运行时，把老版本（exe 同级目录）里的数据搬过来，
+        /// 这样升级成安装版不会丢打卡记录。
+        /// </summary>
+        static void MigrateOnce(string newRoot)
+        {
+            if (_migrated) return;
+            _migrated = true;
+            try
+            {
+                string oldRoot = AppDomain.CurrentDomain.BaseDirectory;
+                // 已经是同一个位置就没什么可搬的
+                if (string.Equals(Path.GetFullPath(oldRoot).TrimEnd('\\'),
+                                  Path.GetFullPath(newRoot).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                string oldData = Path.Combine(oldRoot, "data");
+                string newData = Path.Combine(newRoot, "data");
+                Directory.CreateDirectory(newData);
+
+                if (Directory.Exists(oldData))
+                {
+                    foreach (var f in Directory.GetFiles(oldData))
+                    {
+                        string target = Path.Combine(newData, Path.GetFileName(f));
+                        if (!File.Exists(target)) File.Copy(f, target, false);
+                    }
+                }
+
+                // settings.ini 也搬过来
+                string oldIni = Path.Combine(oldRoot, "settings.ini");
+                string newIni = Path.Combine(newRoot, "settings.ini");
+                if (File.Exists(oldIni) && !File.Exists(newIni)) File.Copy(oldIni, newIni, false);
+            }
+            catch { }
+        }
+
+        /// <summary>用户数据目录（打卡记录、课本索引、令牌等）</summary>
         public static string DataDir
         {
             get
             {
-                string d = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+                string d = Path.Combine(Root, "data");
                 Directory.CreateDirectory(d);
                 return d;
             }
         }
+        static string SettingsPath { get { return Path.Combine(Root, "settings.ini"); } }
         static string ProgressPath { get { return Path.Combine(DataDir, "progress.tsv"); } }
 
         public static void Load()
@@ -312,7 +372,7 @@ namespace StudyCompanion
         {
             try
             {
-                string f = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.ini");
+                string f = SettingsPath;
                 if (!File.Exists(f)) return def;
                 foreach (var line in File.ReadAllLines(f, Encoding.UTF8))
                 {
@@ -329,7 +389,7 @@ namespace StudyCompanion
         {
             try
             {
-                string f = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.ini");
+                string f = SettingsPath;
                 var lines = File.Exists(f) ? File.ReadAllLines(f, Encoding.UTF8).ToList() : new List<string>();
                 bool found = false;
                 for (int i = 0; i < lines.Count; i++)

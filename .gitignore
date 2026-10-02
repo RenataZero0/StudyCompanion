@@ -54,3 +54,7 @@ StudyCompanion/assetprobe.exe
 # 模拟器调试临时截图
 StudyCompanionAndroid/preview/phone-*.png
 
+
+# 安装程序的编译中间产物
+StudyCompanionSetup/build/
+

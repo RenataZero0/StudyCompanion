@@ -1010,7 +1010,7 @@ namespace StudyCompanion
                 sb.AppendLine("del \"" + newExe + "\" > nul 2>&1");
                 sb.AppendLine("start \"\" \"" + self + "\"");
                 sb.AppendLine("del \"%~f0\" > nul 2>&1");
-                File.WriteAllText(bat, sb.ToString(), new UTF8Encoding(false));
+                File.WriteAllText(bat, sb.ToString(), Encoding.Default);
 
                 var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c \"" + bat + "\"");
                 psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;

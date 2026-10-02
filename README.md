@@ -17,7 +17,8 @@
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
-| **Windows** | `StudyCompanion.exe` | 免安装，双击即用（.NET Framework 4.x，Windows 自带） |
+| **Windows** | `StudyCompanion-Setup.exe` | **安装程序**（推荐）：三步向导、开始菜单、可在「应用和功能」里卸载 |
+| **Windows**（绿色版） | `StudyCompanion.exe` | 免安装，双击即用，app 数据存在 exe 旁边的 `data\` 里 |
 | **Android** | `StudyCompanion.apk` | Android 5.0+，已签名，直接安装 |
 
 > 想改回公开仓库（下载就不需要登录了）：仓库 Settings → 最下方 **Change visibility** → Make public。
@@ -48,6 +49,7 @@
 ├─ GITHUB_SETUP.md            启用 GitHub 登录 / 同步 / 自动更新的一次性配置
 ├─ _plan/                     课表生成脚本（课程目录 + 排课引擎）
 │
+├─ StudyCompanionSetup/       Windows 安装程序（向导 + 卸载 + 注册表登记）
 ├─ StudyCompanion/            Windows 桌面版
 │   ├─ StudyCompanion.exe     主程序
 │   ├─ build.ps1              编译（只要 Windows 自带的 csc.exe）
