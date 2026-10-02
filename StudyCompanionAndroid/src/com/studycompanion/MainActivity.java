@@ -90,17 +90,60 @@ public class MainActivity extends Activity implements MainView.Listener {
         }).start();
     }
 
-    /** 自动检查发现新版时的提示 */
+    /**
+     * 发现新版本的提示。正文放进可滚动区域并且限制高度，
+     * 否则改动说明一长，底下的按钮就被挤出屏幕了。
+     */
     private void showUpdateDialog(final GitHub.Release rel) {
+        float d = getResources().getDisplayMetrics().density;
+        int pad = (int) (16 * d);
+
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(pad, (int) (8 * d), pad, 0);
+
+        // 版本 / 大小
+        android.widget.TextView info = new android.widget.TextView(this);
+        info.setText("当前版本：" + GitHub.VERSION_TAG
+                + "\n最新版本：" + rel.tag
+                + "\n安装包大小：" + (rel.apkSize / 1024) + " KB");
+        info.setTextSize(13f);
+        info.setTextColor(0xFF71809A);
+        info.setLineSpacing(0, 1.2f);
+        box.addView(info);
+
+        // 改动说明（可滚动，最高约占屏幕 40%）
+        String notes = mdToPlain(rel.notes);
+        if (notes.length() > 0) {
+            android.widget.TextView body = new android.widget.TextView(this);
+            body.setText(notes);
+            body.setTextSize(13.5f);
+            body.setTextColor(0xFF3C4A60);
+            body.setLineSpacing(0, 1.3f);
+            body.setPadding(0, pad, 0, 0);
+
+            int wSpec = android.view.View.MeasureSpec.makeMeasureSpec(
+                    getResources().getDisplayMetrics().widthPixels - pad * 2,
+                    android.view.View.MeasureSpec.AT_MOST);
+            body.measure(wSpec, android.view.View.MeasureSpec.UNSPECIFIED);
+            int bodyH = body.getMeasuredHeight();
+            int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.40f);
+            int h = Math.min(bodyH, maxH);
+
+            android.widget.ScrollView sv = new android.widget.ScrollView(this);
+            sv.addView(body);
+            box.addView(sv, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, h));
+        }
+
         new AlertDialog.Builder(this)
                 .setTitle("发现新版本 " + rel.tag)
-                .setMessage("当前：" + GitHub.VERSION_TAG
-                        + "\n大小：" + (rel.apkSize / 1024) + " KB\n\n" + head(rel.notes))
+                .setView(box)
                 .setPositiveButton("下载并安装", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) { downloadApk(rel); }
+                    public void onClick(DialogInterface dlg, int w) { downloadApk(rel); }
                 })
-                .setNeutralButton("打开 Release 页", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) { openUrl(rel.pageUrl); }
+                .setNeutralButton("Release 页", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dlg, int w) { openUrl(rel.pageUrl); }
                 })
                 .setNegativeButton("以后再说", null)
                 .show();
@@ -452,17 +495,8 @@ public class MainActivity extends Activity implements MainView.Listener {
             toast("这个 Release 里没有 APK 附件");
             return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle("发现新版本 " + rel.tag)
-                .setMessage("当前：" + GitHub.VERSION_TAG
-                        + "\n大小：" + (rel.apkSize / 1024) + " KB\n\n" + head(rel.notes))
-                .setPositiveButton("下载并安装", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) { downloadApk(rel); }
-                })
-                .setNeutralButton("打开 Release 页", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) { openUrl(rel.pageUrl); }
-                })
-                .setNegativeButton("取消", null).show();
+        // 手动检查和自动检查共用同一个弹窗
+        showUpdateDialog(rel);
     }
 
     private void onUpdateError(Exception e) {
@@ -470,10 +504,47 @@ public class MainActivity extends Activity implements MainView.Listener {
         simple("检查更新失败", String.valueOf(e.getMessage()));
     }
 
-    static String head(String s) {
+    /**
+     * 把 Release 说明里的 Markdown 转成能直接看的纯文本。
+     *
+     * 以前是原样截断 400 字塞进弹窗，结果 "## 标题"、"**加粗**"、``` 围栏
+     * 全都露在外面，又长又乱。这里去掉标记，保留段落和列表结构。
+     */
+    static String mdToPlain(String s) {
         if (s == null) return "";
-        s = s.replace("\r", "");
-        return s.length() > 400 ? s.substring(0, 400) + "…" : s;
+        s = s.replace("\r\n", "\n").replace('\r', '\n');
+
+        StringBuilder out = new StringBuilder();
+        boolean inFence = false;
+        for (String raw : s.split("\n")) {
+            String t = raw.trim();
+            if (t.startsWith("```") || t.startsWith("~~~")) { inFence = !inFence; continue; }
+            if (inFence) { out.append("    ").append(raw).append('\n'); continue; }
+
+            // 标题：去掉开头的 #
+            int h = 0;
+            while (h < t.length() && t.charAt(h) == '#') h++;
+            if (h > 0 && h < t.length() && t.charAt(h) == ' ') {
+                if (out.length() > 0) out.append('\n');
+                out.append(t.substring(h + 1).trim()).append('\n');
+                continue;
+            }
+            if (t.startsWith("- ") || t.startsWith("* ")) {
+                out.append("· ").append(t.substring(2)).append('\n');
+                continue;
+            }
+            if (t.startsWith("> ")) { out.append("　").append(t.substring(2)).append('\n'); continue; }
+            if (t.startsWith("|")) continue;     // 表格在弹窗里没意义，丢掉
+            if (t.equals("---") || t.equals("***")) { out.append('\n'); continue; }
+            out.append(t).append('\n');
+        }
+
+        String r = out.toString();
+        r = r.replace("**", "").replace("`", "").replace("~~", "");
+        while (r.contains("\n\n\n")) r = r.replace("\n\n\n", "\n\n");
+        r = r.trim();
+        // 太长了也没人看，留个头
+        return r.length() > 2600 ? r.substring(0, 2600) + "\n\n…（还有更多，可打开 Release 页查看）" : r;
     }
 
     // ------------------------------------------------------------------ 下载 APK
