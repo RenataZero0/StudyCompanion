@@ -4,6 +4,44 @@
 
 ---
 
+## v2.0 —— 内置 GitHub 登录：同步打卡记录 + 自动更新
+
+### 1. GitHub 登录（设备码流程）
+
+仓库改成私有之后，程序要访问它就得先登录。用的是 GitHub 官方的 **Device Flow**，和 `gh` 命令行工具同一套机制：
+
+> 点「登录 GitHub」→ 弹窗显示一个 8 位代码（自动复制到剪贴板）→ 浏览器打开授权页 → 粘贴 → 点 Authorize → 完成
+
+- **不需要 client_secret**，所以 Client ID 直接写在客户端里是安全的
+- 令牌用 **DPAPI 加密**后存在 `data/github.dat`，只有当前 Windows 用户能解密
+- 未登录时会显示「还没有填入 OAuth App 的 Client ID」并提示去哪里配
+
+> 配置步骤（注册 OAuth App、填 Client ID）见仓库根目录的 **`GITHUB_SETUP.md`**。
+
+### 2. 打卡记录同步
+
+「设置与工具」下面多了一张 **GitHub 同步** 卡片：
+
+- **立即同步** —— 与私有仓库的 `sync/progress.txt` 交换打卡记录
+- 合并策略是**并集**：手机和电脑各自标的完成都会保留，**只增不减，不会互相覆盖**
+- 只有内容真的变了才提交，避免无意义的 commit
+- 两端记录的键格式完全一致（`yyyy-MM-dd|HH:mm-HH:mm`），所以能直接互通
+
+### 3. 自动更新
+
+- **检查更新** —— 读取私有仓库的最新 Release，和内置的 `VersionTag` 比较
+- 发现新版会显示版本号、体积和更新说明，确认后**下载并自动替换自身**
+- 正在运行的 exe 无法自我覆盖，所以会写一个临时批处理：等本进程退出 → 覆盖 → 自动重启
+
+### 4. 顺带的工程改动
+
+- 新增 `src/GitHub.cs`（设备码登录 + REST API + 同步 + 下载）
+- `Store.cs` 新增 `DoneKeys()` / `MergeKeys()`
+- 编译需要多引用 `System.Web.Extensions.dll`（解析 JSON）与 `System.Security.dll`（DPAPI 加密）
+- 右侧多了一张卡片，右栏本来就可滚动，不影响原有布局
+
+---
+
 ## v1.9 —— 把资源文件收进 `assets\` 文件夹
 
 `StudyCompanion\` 顶层原来散着一堆图片和图标，现在统一收进 **`assets\`**：

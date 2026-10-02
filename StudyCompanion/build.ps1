@@ -1,4 +1,4 @@
-# Build StudyCompanion.exe
+﻿# Build StudyCompanion.exe
 # Usage: powershell -ExecutionPolicy Bypass -File build.ps1
 #
 # NOTE: keep this file ASCII-only. PowerShell 5.1 decodes .ps1 files as ANSI
@@ -25,7 +25,7 @@ if (Test-Path $ico) {
 & $csc /nologo /codepage:65001 /target:winexe /optimize+ /out:$out `
     /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll `
     /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll `
-    /r:System.Xml.Linq.dll /r:System.Core.dll @iconArgs $src
+    /r:System.Xml.Linq.dll /r:System.Core.dll /r:System.Web.Extensions.dll /r:System.Security.dll @iconArgs $src
 
 if ($LASTEXITCODE -eq 0) { Write-Host "OK -> $out" -ForegroundColor Green }
 else { Write-Host "BUILD FAILED (exit $LASTEXITCODE)" -ForegroundColor Red }

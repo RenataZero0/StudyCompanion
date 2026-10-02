@@ -56,6 +56,19 @@ namespace StudyCompanion
         public static string Key(DateTime d, Slot s) { return d.ToString("yyyy-MM-dd") + "|" + s.Key; }
         public static bool IsDone(DateTime d, Slot s) { return _done.Contains(Key(d, s)); }
 
+        /// <summary>所有已完成的「日期|时段」键（云端同步用）</summary>
+        public static IEnumerable<string> DoneKeys() { return _done.ToList(); }
+
+        /// <summary>并入一批键（并集，不删除本地记录）。返回新增条数</summary>
+        public static int MergeKeys(IEnumerable<string> keys)
+        {
+            int added = 0;
+            foreach (var k in keys)
+                if (!string.IsNullOrEmpty(k) && !k.StartsWith("#") && _done.Add(k)) added++;
+            if (added > 0) Save();
+            return added;
+        }
+
         public static bool SetDone(DateTime d, Slot s, bool v)
         {
             string k = Key(d, s);

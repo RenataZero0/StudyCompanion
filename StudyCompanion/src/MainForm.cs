@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -420,6 +421,7 @@ namespace StudyCompanion
         readonly MiniCalendar _cal = new MiniCalendar();
         readonly SimpleCard _stats = new SimpleCard("学习统计");
         readonly SimpleCard _tools = new SimpleCard("设置与工具");
+        readonly SimpleCard _github = new SimpleCard("GitHub 同步");
         readonly Card _calCard = new Card();
         DateTime _viewDate = DateTime.Today;
         public bool ForceClose = false;
@@ -491,6 +493,7 @@ namespace StudyCompanion
 
             _rightFlow.Controls.Add(_stats);
             _rightFlow.Controls.Add(_tools);
+            _rightFlow.Controls.Add(_github);
 
             // 工具按钮（分三组，界面更清爽）
             _tools.AddGroup("学习记录");
@@ -520,6 +523,8 @@ namespace StudyCompanion
                 ((Pill)s).Text = CloseBehaviorText();
                 ((Pill)s).Invalidate();
             }, false);
+
+            BuildGitHubCard();
 
             _cal.DateSelected += delegate
             {
@@ -687,6 +692,7 @@ namespace StudyCompanion
             sb.Append("calCard=").Append(_calCard.Bounds).Append(" | ");
             sb.Append("stats=").Append(_stats.Bounds).Append(" | ");
             sb.Append("tools=").Append(_tools.Bounds).Append(" | ");
+                sb.Append("github=").Append(_github.Bounds).Append(" | ");
             sb.Append("leftW=").Append(_leftScroll.Width).Append('/').Append(_leftScroll.ClientSize.Width).Append(" | ");
             int n = 0;
             foreach (Control c in _leftScroll.Controls)
@@ -804,6 +810,265 @@ namespace StudyCompanion
             }
         }
 
+        // ============================================================== GitHub
+        void BuildGitHubCard()
+        {
+            _github.Groups.Clear();
+            foreach (Control c in _github.Controls.Cast<Control>().ToList()) _github.Controls.Remove(c);
+
+            int w = ColWidth(_rightFlow);
+
+            if (!GitHub.Configured)
+            {
+                _github.Lines = new List<string> {
+                    "还没有填入 OAuth App 的 Client ID。",
+                    "把 Client ID 填进 GitHub.cs 后重新编译即可启用。"
+                };
+            }
+            else if (GitHub.LoggedIn)
+            {
+                _github.Lines = new List<string> { "已登录：" + GitHub.User };
+                _github.AddGroup("打卡记录同步");
+                _github.AddButton("立即同步", delegate { GhSync(); }, true);
+                _github.AddGroup("版本更新");
+                _github.AddButton("检查更新", delegate { GhCheckUpdate(); }, false);
+                _github.AddGroup("账号");
+                _github.AddButton("退出登录", delegate { GhLogout(); }, false);
+            }
+            else
+            {
+                _github.Lines = new List<string> {
+                    "登录后可以：手机与电脑同步打卡记录、检查并下载新版本。"
+                };
+                _github.AddGroup("登录");
+                _github.AddButton("登录 GitHub", delegate { GhLogin(); }, true);
+            }
+
+            _github.DoLayout(w);
+            _github.Invalidate();
+            DoLayoutRight();
+        }
+
+        void GhLogin()
+        {
+            var dlg = new Form();
+            dlg.Text = "登录 GitHub";
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.ClientSize = new Size(Ui.Px(440), Ui.Px(196));
+            dlg.MaximizeBox = false; dlg.MinimizeBox = false;
+            dlg.BackColor = Color.White;
+
+            var lbl = new Label();
+            lbl.Text = "正在向 GitHub 申请登录码…";
+            lbl.Font = Ui.F(10f);
+            lbl.SetBounds(Ui.Px(18), Ui.Px(16), Ui.Px(404), Ui.Px(122));
+            dlg.Controls.Add(lbl);
+
+            var open = new Button();
+            open.Text = "打开浏览器";
+            open.Font = Ui.F(9f);
+            open.SetBounds(Ui.Px(18), Ui.Px(146), Ui.Px(116), Ui.Px(32));
+            open.Enabled = false;
+            dlg.Controls.Add(open);
+
+            var cancel = new Button();
+            cancel.Text = "取消";
+            cancel.Font = Ui.F(9f);
+            cancel.SetBounds(Ui.Px(146), Ui.Px(146), Ui.Px(90), Ui.Px(32));
+            dlg.Controls.Add(cancel);
+
+            bool stop = false;
+            cancel.Click += delegate { stop = true; dlg.Close(); };
+
+            var worker = new System.ComponentModel.BackgroundWorker();
+            worker.DoWork += delegate
+            {
+                try
+                {
+                    var dc = GitHub.DeviceStart();
+                    dlg.BeginInvoke((MethodInvoker)delegate
+                    {
+                        lbl.Text = "在浏览器里完成授权\n\n"
+                                 + "代码：  " + dc.UserCode + "\n\n"
+                                 + "已经复制到剪贴板。请在打开的页面粘贴它，再点绿色的 Authorize。\n"
+                                 + "没自动打开就手动访问 " + dc.VerifyUrl;
+                        try { Clipboard.SetText(dc.UserCode); } catch { }
+                        open.Enabled = true;
+                        open.Click += delegate { try { System.Diagnostics.Process.Start(dc.VerifyUrl); } catch { } };
+                        try { System.Diagnostics.Process.Start(dc.VerifyUrl); } catch { }
+                    });
+
+                    string token = GitHub.DevicePoll(dc, delegate { return stop; });
+                    string user = "";
+                    try { user = GitHub.CurrentUser(); } catch { }
+                    GitHub.SaveToken(token, user);
+                    dlg.BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (!stop) dlg.Close();
+                        BuildGitHubCard();
+                        MessageBox.Show(this, "已登录 GitHub：" + (user.Length > 0 ? user : "(已授权)"), "登录成功");
+                    });
+                }
+                catch (Exception ex)
+                {
+                    dlg.BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (!stop) dlg.Close();
+                        MessageBox.Show(this, "登录失败：" + ex.Message, "提示");
+                    });
+                }
+            };
+            worker.RunWorkerAsync();
+            dlg.ShowDialog(this);
+            stop = true;
+        }
+
+        void GhLogout()
+        {
+            if (MessageBox.Show(this, "退出后无法同步打卡记录，也不能检查更新。\n已经同步过的记录不受影响。",
+                    "退出 GitHub 登录？", MessageBoxButtons.OKCancel) != DialogResult.OK) return;
+            GitHub.Logout();
+            BuildGitHubCard();
+        }
+
+        void GhSync()
+        {
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                var r = GitHub.Sync();
+                Cursor = Cursors.Default;
+                RefreshLight();
+                BuildGitHubCard();
+                MessageBox.Show(this,
+                    "从云端新增：" + r.Pulled + " 条\n合计打卡：" + r.Total + " 条\n"
+                    + (r.Uploaded ? "已把本地记录上传到仓库" : "云端已是最新，无需上传"),
+                    "同步完成");
+            }
+            catch (Exception ex)
+            {
+                Cursor = Cursors.Default;
+                MessageBox.Show(this, "同步失败：" + ex.Message, "提示");
+            }
+        }
+
+        void GhCheckUpdate()
+        {
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                var rel = GitHub.LatestRelease();
+                Cursor = Cursors.Default;
+
+                if (string.Equals(rel.Tag, GitHub.VersionTag, StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show(this, "当前：" + GitHub.VersionTag + "\n最新：" + rel.Tag, "已是最新版本");
+                    return;
+                }
+                if (string.IsNullOrEmpty(rel.ExeUrl))
+                {
+                    MessageBox.Show(this, "这个 Release 里没有 exe 附件。", "提示");
+                    return;
+                }
+
+                string notes = rel.Notes == null ? "" : rel.Notes;
+                if (notes.Length > 500) notes = notes.Substring(0, 500) + "…";
+                if (MessageBox.Show(this,
+                        "发现新版本 " + rel.Tag + "\n当前：" + GitHub.VersionTag
+                        + "\n大小：" + (rel.ExeSize / 1024) + " KB\n\n" + notes
+                        + "\n\n现在下载并安装吗？",
+                        "发现新版本", MessageBoxButtons.OKCancel) != DialogResult.OK) return;
+
+                DownloadAndInstall(rel);
+            }
+            catch (Exception ex)
+            {
+                Cursor = Cursors.Default;
+                MessageBox.Show(this, "检查更新失败：" + ex.Message, "提示");
+            }
+        }
+
+        void DownloadAndInstall(GitHub.Release rel)
+        {
+            string tmp = Path.Combine(Path.GetTempPath(), "StudyCompanion-" + rel.Tag + ".exe");
+            var prog = new Form();
+            prog.Text = "正在下载新版本";
+            prog.FormBorderStyle = FormBorderStyle.FixedDialog;
+            prog.StartPosition = FormStartPosition.CenterParent;
+            prog.ClientSize = new Size(Ui.Px(380), Ui.Px(96));
+            prog.MaximizeBox = false; prog.MinimizeBox = false; prog.ControlBox = false;
+            prog.BackColor = Color.White;
+            var lbl = new Label();
+            lbl.Text = "准备下载…";
+            lbl.Font = Ui.F(10f);
+            lbl.SetBounds(Ui.Px(18), Ui.Px(30), Ui.Px(344), Ui.Px(40));
+            prog.Controls.Add(lbl);
+
+            var worker = new System.ComponentModel.BackgroundWorker();
+            worker.DoWork += delegate
+            {
+                try
+                {
+                    GitHub.Download(rel.ExeUrl, tmp, delegate (long got, long total)
+                    {
+                        int pct = total > 0 ? (int)(got * 100 / total) : -1;
+                        prog.BeginInvoke((MethodInvoker)delegate
+                        {
+                            lbl.Text = pct >= 0
+                                ? ("已下载 " + (got / 1024) + " / " + (total / 1024) + " KB  (" + pct + "%)")
+                                : ("已下载 " + (got / 1024) + " KB");
+                        });
+                    });
+                    prog.BeginInvoke((MethodInvoker)delegate { prog.Close(); ReplaceSelf(tmp); });
+                }
+                catch (Exception ex)
+                {
+                    prog.BeginInvoke((MethodInvoker)delegate
+                    {
+                        prog.Close();
+                        MessageBox.Show(this, "下载失败：" + ex.Message, "提示");
+                    });
+                }
+            };
+            worker.RunWorkerAsync();
+            prog.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// 正在运行的 exe 不能被覆盖，所以写一个批处理：
+        /// 等本进程退出 → 覆盖 → 重新启动。
+        /// </summary>
+        void ReplaceSelf(string newExe)
+        {
+            try
+            {
+                string self = Application.ExecutablePath;
+                string bat = Path.Combine(Path.GetTempPath(), "sc-update.bat");
+                var sb = new StringBuilder();
+                sb.AppendLine("@echo off");
+                sb.AppendLine("ping 127.0.0.1 -n 3 > nul");
+                sb.AppendLine(":retry");
+                sb.AppendLine("copy /y \"" + newExe + "\" \"" + self + "\" > nul 2>&1");
+                sb.AppendLine("if errorlevel 1 ( ping 127.0.0.1 -n 2 > nul & goto retry )");
+                sb.AppendLine("del \"" + newExe + "\" > nul 2>&1");
+                sb.AppendLine("start \"\" \"" + self + "\"");
+                sb.AppendLine("del \"%~f0\" > nul 2>&1");
+                File.WriteAllText(bat, sb.ToString(), new UTF8Encoding(false));
+
+                ForceClose = true;
+                var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c \"" + bat + "\"");
+                psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+                psi.UseShellExecute = true;
+                System.Diagnostics.Process.Start(psi);
+                Application.Exit();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "自动替换失败：" + ex.Message, "提示");
+            }
+        }
+
         void DoLayoutRight()
         {
             int w = ColWidth(_rightFlow);
@@ -811,7 +1076,8 @@ namespace StudyCompanion
             _calCard.SetBounds(0, y, w, Ui.Px(300)); y += Ui.Px(300) + Ui.Px(12);
             _cal.SetBounds(Ui.Px(10), Ui.Px(10), w - Ui.Px(20), Ui.Px(278));
             _stats.DoLayout(w); _stats.SetBounds(0, y, w, _stats.Height); y += _stats.Height + Ui.Px(12);
-            _tools.DoLayout(w); _tools.SetBounds(0, y, w, _tools.Height);
+            _tools.DoLayout(w); _tools.SetBounds(0, y, w, _tools.Height); y += _tools.Height + Ui.Px(12);
+            _github.DoLayout(w); _github.SetBounds(0, y, w, _github.Height);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

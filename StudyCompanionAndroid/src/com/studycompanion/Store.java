@@ -27,6 +27,15 @@ public class Store {
         sp.edit().putStringSet("done", new HashSet<String>(s)).apply();
     }
 
+    /** 用一整批 key 覆盖（云端同步用）。返回新增条数 */
+    public static int mergeKeys(Set<String> incoming) {
+        Set<String> cur = done();
+        int added = 0;
+        for (String k : incoming) if (cur.add(k)) added++;
+        if (added > 0) save(cur);
+        return added;
+    }
+
     public static String key(String iso, ScheduleData.Slot s) { return iso + "|" + s.key(); }
 
     public static boolean isDone(String iso, ScheduleData.Slot s) {

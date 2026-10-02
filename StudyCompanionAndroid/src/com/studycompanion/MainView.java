@@ -24,6 +24,10 @@ public class MainView extends View {
         void exportCsv();
         void importCsv();
         void showChangelog();
+        void ghLogin();
+        void ghLogout();
+        void ghSync();
+        void ghCheckUpdate();
     }
 
     static class Hit {
@@ -35,7 +39,8 @@ public class MainView extends View {
     }
 
     static final int A_URL = 1, A_TOGGLE = 2, A_DAY = 3, A_MENU = 4, A_EXPORT = 5,
-            A_IMPORT = 6, A_LOG = 7, A_TODAY = 8, A_CLOSE_MENU = 9, A_REMIND = 10;
+            A_IMPORT = 6, A_LOG = 7, A_TODAY = 8, A_CLOSE_MENU = 9, A_REMIND = 10,
+            A_GH_LOGIN = 11, A_GH_LOGOUT = 12, A_GH_SYNC = 13, A_GH_UPDATE = 14;
 
     private final Listener listener;
     private final List<Hit> hits = new ArrayList<Hit>();
@@ -175,6 +180,18 @@ public class MainView extends View {
                 Store.setAutoRemind(!Store.autoRemind());
                 Reminder.scheduleAll(getContext());
                 break;
+            case A_GH_LOGIN:
+                if (listener != null) listener.ghLogin();
+                break;
+            case A_GH_LOGOUT:
+                if (listener != null) listener.ghLogout();
+                break;
+            case A_GH_SYNC:
+                if (listener != null) listener.ghSync();
+                break;
+            case A_GH_UPDATE:
+                if (listener != null) listener.ghCheckUpdate();
+                break;
         }
         invalidate();
     }
@@ -198,8 +215,15 @@ public class MainView extends View {
 
         float W = getWidth(), H = getHeight();
         headerH = Ui.px(108);
-        float pad = Ui.px(14);
-        float contentW = W - pad * 2;
+        float outer = Ui.px(14);
+        float gap = Ui.px(14);
+
+        // 内容整体居中并限制最大宽度：超宽屏 / 横屏时不会被拉成一条细长带
+        float total = Math.min(W - outer * 2, Ui.px(1180));
+        boxX0 = Math.round((W - total) / 2f);
+        boxX1 = boxX0 + total;
+        // 平板 / 横屏：左右两栏（与桌面版一致）；手机竖屏：单栏
+        boolean twoCol = total >= Ui.px(720);
 
         float bodyTop = headerH;
         c.save();
@@ -207,12 +231,23 @@ public class MainView extends View {
         hitOffset = bodyTop - scrollY;
         c.translate(0, hitOffset);
 
-        float y = Ui.px(14);
-        y = drawCards(c, pad, contentW, y);
-        y = drawCalendar(c, pad, contentW, y + Ui.px(4));
-        y = drawStats(c, pad, contentW, y + Ui.px(4));
-        y = drawTools(c, pad, contentW, y + Ui.px(4));
-        contentH = y + Ui.px(30);
+        if (!twoCol) {
+            float y = Ui.px(14);
+            y = drawCards(c, boxX0, total, y);
+            y = drawCalendar(c, boxX0, total, y + Ui.px(4));
+            y = drawStats(c, boxX0, total, y + Ui.px(4));
+            y = drawTools(c, boxX0, total, y + Ui.px(4));
+            contentH = y + Ui.px(30);
+        } else {
+            float leftW = Math.round((total - gap) * 0.60f);
+            float rightW = total - gap - leftW;
+            float xr = boxX0 + leftW + gap;
+            float yl = drawCards(c, boxX0, leftW, Ui.px(14));
+            float yr = drawCalendar(c, xr, rightW, Ui.px(14));
+            yr = drawStats(c, xr, rightW, yr + gap);
+            yr = drawTools(c, xr, rightW, yr + gap);
+            contentH = Math.max(yl, yr) + Ui.px(30);
+        }
         c.restore();
 
         clampScroll();
@@ -224,7 +259,9 @@ public class MainView extends View {
     // ---------------------------------------------------------------- 顶部
     private void drawHeader(Canvas c, float W) {
         Ui.roundRect(c, 0, 0, W, headerH, 0, 0xFFFFFFFF);
-        float pad = Ui.px(16);
+        // 顶栏内容与下方卡片对齐（超宽屏时不会一个居中一个贴边）
+        float padL = boxX0 + Ui.px(16);
+        float padR = boxX1 - Ui.px(16);
 
         ScheduleData.DayPlan dp = ScheduleData.getDay(viewIso);
         Calendar cal = calOf(viewIso);
@@ -233,7 +270,7 @@ public class MainView extends View {
                 + wd[cal.get(Calendar.DAY_OF_WEEK) - 1];
 
         Paint pTitle = Ui.font(20, true, Ui.INK);
-        Ui.text(c, title, pad, Ui.px(30), pTitle);
+        Ui.text(c, title, padL, Ui.px(30), pTitle);
 
         // 徽章
         String badge = dp == null ? "无课表" : dp.dayKind();
@@ -244,7 +281,7 @@ public class MainView extends View {
         }
         Paint pBadge = Ui.font(11, true, bfg);
         float bw = pBadge.measureText(badge) + Ui.px(20);
-        float bx = pad + pTitle.measureText(title) + Ui.px(10);
+        float bx = padL + pTitle.measureText(title) + Ui.px(10);
         Ui.roundRect(c, bx, Ui.px(12), bx + bw, Ui.px(36), Ui.px(12), bbg);
         Ui.textC(c, badge, new RectF(bx, Ui.px(12), bx + bw, Ui.px(36)), pBadge);
 
@@ -253,25 +290,25 @@ public class MainView extends View {
         int total = dp == null ? 0 : dp.slots.size();
         String sub = dp == null ? "这一天没有安排"
                 : (total + " 个时段 · 共 " + trim(dp.totalMinutes() / 60.0) + " 小时");
-        Ui.text(c, sub, pad, Ui.px(54), Ui.font(12, false, Ui.SUB));
+        Ui.text(c, sub, padL, Ui.px(54), Ui.font(12, false, Ui.SUB));
 
         String ptxt = total == 0 ? "今日无安排" : ("今日进度 " + done + " / " + total);
         Paint pProg = Ui.font(12, true, (total > 0 && done >= total) ? Ui.GREEN : Ui.INK);
-        Ui.text(c, ptxt, W - pad - pProg.measureText(ptxt), Ui.px(54), pProg);
+        Ui.text(c, ptxt, padR - pProg.measureText(ptxt), Ui.px(54), pProg);
 
         // 进度条
         float barY = Ui.px(64);
-        Ui.roundRect(c, pad, barY, W - pad, barY + Ui.px(8), Ui.px(4), 0xFFE7EBF3);
+        Ui.roundRect(c, padL, barY, padR, barY + Ui.px(8), Ui.px(4), 0xFFE7EBF3);
         double ratio = total == 0 ? 0 : Math.min(1.0, (double) done / total);
         if (ratio > 0) {
-            float w = (float) Math.max(Ui.px(8), (W - pad * 2) * ratio);
-            Ui.roundRect(c, pad, barY, pad + w, barY + Ui.px(8), Ui.px(4),
+            float w = (float) Math.max(Ui.px(8), (padR - padL) * ratio);
+            Ui.roundRect(c, padL, barY, padL + w, barY + Ui.px(8), Ui.px(4),
                     (total > 0 && done >= total) ? Ui.GREEN : Ui.ACCENT);
         }
 
         String s2 = "连续打卡 " + Store.streak() + " 天 · 最长 " + Store.bestStreak()
                 + " 天 · 累计 " + trim(Store.totalHours()) + " 小时";
-        Ui.text(c, s2, pad, Ui.px(92), Ui.font(11, false, Ui.SUB));
+        Ui.text(c, s2, padL, Ui.px(92), Ui.font(11, false, Ui.SUB));
 
         Ui.roundRect(c, 0, headerH - Ui.px(1), W, headerH, 0, Ui.LINE);
     }
@@ -482,6 +519,8 @@ public class MainView extends View {
     }
 
     String displayMonthIso = ScheduleData.todayIso().substring(0, 7);
+    /** 内容区左右边界（超宽屏时整体居中） */
+    private float boxX0 = 0, boxX1 = 0;
 
     // ---------------------------------------------------------------- 统计 / 工具
     private float drawStats(Canvas c, float pad, float w, float y) {
@@ -506,15 +545,58 @@ public class MainView extends View {
         };
     }
 
+    /** 工具区的分组：[标题, 按钮..., 以 \u0001 开头的说明行(可选)] */
+    private List<String[]> toolGroups() {
+        List<String[]> gs = new ArrayList<String[]>();
+        gs.add(new String[]{"学习记录", "导出记录 CSV", "导入记录 CSV"});
+        gs.add(new String[]{"其他", "查看更新日志", "回到今天"});
+        gs.add(new String[]{"提醒", Store.autoRemind() ? "到点提醒：已开启" : "到点提醒：已关闭"});
+
+        boolean cfg = GitHub.configured();
+        boolean in = GitHub.loggedIn(getContext());
+        if (!cfg) {
+            gs.add(new String[]{"GitHub 同步", "登录 GitHub",
+                    "\u0001还没填 OAuth App 的 Client ID，需要重新编译"});
+        } else if (!in) {
+            gs.add(new String[]{"GitHub 同步", "登录 GitHub",
+                    "\u0001登录后可同步打卡记录、检查更新"});
+        } else {
+            gs.add(new String[]{"GitHub 同步", "立即同步", "检查更新", "退出登录",
+                    "\u0001已登录：" + GitHub.user(getContext())});
+        }
+        return gs;
+    }
+
+    /** 量一组按钮会占几行 */
+    private int buttonRows(String[] labels, float avail, Paint p) {
+        int rows = 1;
+        float bx = 0;
+        for (int i = 1; i < labels.length; i++) {
+            String label = labels[i];
+            if (label.startsWith("\u0001")) continue;
+            float bw = Math.max(Ui.px(104), p.measureText(label) + Ui.px(24));
+            if (bx + bw > avail && bx > 0) { rows++; bx = 0; }
+            bx += bw + Ui.px(8);
+        }
+        return rows;
+    }
+
     private float drawTools(Canvas c, float pad, float w, float y) {
-        String[][] groups = {
-                {"学习记录", "导出记录 CSV", "导入记录 CSV"},
-                {"其他", "查看更新日志", "回到今天"},
-                {"提醒", Store.autoRemind() ? "到点提醒：已开启" : "到点提醒：已关闭"},
-        };
+        List<String[]> groups = toolGroups();
+        float avail = w - Ui.px(32);
+        Paint pBtn0 = Ui.font(12, true, Ui.SUB);
+        Paint pNote = Ui.font(11, false, Ui.TEXT_DIM);
+
+        // 先量高度：按钮会自动换行，高度必须按换行后的行数算，否则卡片会高度不足被裁掉
         float h = Ui.px(48);
-        for (String[] g : groups) h += Ui.px(22) + Ui.px(30) + Ui.px(10);
-        h += Ui.px(4);
+        for (String[] g : groups) {
+            h += Ui.px(22);
+            h += buttonRows(g, avail, pBtn0) * (Ui.px(30) + Ui.px(8));
+            for (int i = 1; i < g.length; i++)
+                if (g[i].startsWith("\u0001")) h += Ui.px(18);
+            h += Ui.px(10);
+        }
+        h += Ui.px(2);
 
         Ui.roundRect(c, pad, y, pad + w, y + h, Ui.px(14), Ui.CARD);
         Ui.roundStroke(c, new RectF(pad, y, pad + w, y + h), Ui.px(14), Ui.LINE, 1f);
@@ -527,11 +609,16 @@ public class MainView extends View {
             cy += Ui.px(22);
             float bx = pad + Ui.px(16);
             for (int i = 1; i < g.length; i++) {
-                boolean primary = "提醒".equals(g[0]);
                 String label = g[i];
+                if (label.startsWith("\u0001")) {
+                    Ui.text(c, label.substring(1), pad + Ui.px(16), cy + Ui.px(13), pNote);
+                    cy += Ui.px(18);
+                    continue;
+                }
+                boolean primary = "提醒".equals(g[0]) || "登录 GitHub".equals(label);
                 Paint pBtn = Ui.font(12, true, primary ? 0xFFFFFFFF : Ui.SUB);
                 float bw = Math.max(Ui.px(104), pBtn.measureText(label) + Ui.px(24));
-                if (bx + bw > pad + w - Ui.px(16)) { bx = pad + Ui.px(16); cy += Ui.px(38); }
+                if (bx + bw > pad + w - Ui.px(16) && bx > pad + Ui.px(16)) { bx = pad + Ui.px(16); cy += Ui.px(38); }
                 RectF r = new RectF(bx, cy, bx + bw, cy + Ui.px(30));
                 Ui.roundRect(c, r, Ui.px(15), primary ? Ui.ACCENT : 0xFFFFFFFF);
                 Ui.roundStroke(c, r, Ui.px(15), primary ? Ui.ACCENT : Ui.LINE, 1f);
@@ -542,6 +629,10 @@ public class MainView extends View {
                 else if ("查看更新日志".equals(label)) action = A_LOG;
                 else if ("回到今天".equals(label)) action = A_TODAY;
                 else if (label.startsWith("到点提醒")) action = A_REMIND;
+                else if (label.startsWith("登录 GitHub")) action = A_GH_LOGIN;
+                else if ("立即同步".equals(label)) action = A_GH_SYNC;
+                else if ("检查更新".equals(label)) action = A_GH_UPDATE;
+                else if ("退出登录".equals(label)) action = A_GH_LOGOUT;
                 hit(r, action, null, 0);
                 bx += bw + Ui.px(8);
             }
@@ -563,14 +654,15 @@ public class MainView extends View {
         float mh = titleH + menuItems.size() * rowH + Ui.px(10);
 
         // 定位到被点的那个胶囊下方
-        float anchorTop = Ui.px(200);
+        float anchorTop = Ui.px(200), anchorLeft = Ui.px(12);
         for (int i = hits.size() - 1; i >= 0; i--) {
             if (hits.get(i).action == A_MENU && hits.get(i).index == menuOwner) {
                 anchorTop = hits.get(i).r.bottom;
+                anchorLeft = hits.get(i).r.left;
                 break;
             }
         }
-        float mx = Ui.px(12);
+        float mx = Math.max(Ui.px(12), Math.min(anchorLeft, boxX1 - mw - Ui.px(12)));
         float my = anchorTop + Ui.px(6);
         if (my + mh > H) my = Math.max(Ui.px(12), anchorTop - mh - Ui.px(52));
         RectF mr = new RectF(mx, my, mx + mw, my + mh);

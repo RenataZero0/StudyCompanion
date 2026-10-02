@@ -8,22 +8,18 @@
 
 ## 直接下载
 
+> 🔒 **本仓库现在是私有的。** 要拿文件需要先登录 GitHub —— 即在浏览器里打开
+> [Releases 页面](https://github.com/RenataZero0/StudyCompanion/releases/latest) 手动下载。
+>
+> 装好之后，程序内置了 **GitHub 登录**，可以自己检查更新、直接下载新版本，
+> 还能把手机和电脑的打卡记录互相同步。配置方法见 **[GITHUB_SETUP.md](GITHUB_SETUP.md)**。
+
 | 平台 | 文件 | 说明 |
 |---|---|---|
-| **Windows** | **[⬇ StudyCompanion.exe](https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.exe)** | 免安装，双击即用（.NET Framework 4.x，Windows 自带） |
-| **Android** | **[⬇ StudyCompanion.apk](https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.apk)** | Android 5.0+，已签名，直接安装 |
+| **Windows** | `StudyCompanion.exe` | 免安装，双击即用（.NET Framework 4.x，Windows 自带） |
+| **Android** | `StudyCompanion.apk` | Android 5.0+，已签名，直接安装 |
 
-上面是**永久直链**，永远指向最新版，可以收藏或分享。
-
-也可以到 [**Releases 页面**](https://github.com/RenataZero0/StudyCompanion/releases/latest) 手动下载，或查看历史版本。
-
-> **离线取用**：如果只想拿文件、不需要看源码，直接下这两个就行：
-> ```
-> https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.exe
-> https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.apk
-> ```
->
-> 国内访问 GitHub 较慢时，可以在浏览器里用代理，或把链接发到手机再下。
+> 想改回公开仓库（下载就不需要登录了）：仓库 Settings → 最下方 **Change visibility** → Make public。
 
 ---
 
@@ -36,6 +32,8 @@
 - **内置日历与统计**：翻月回看任意一天；本周进度、连续打卡、累计学时、本月全勤
 - **学习记录导出 / 导入**：CSV 格式，可备份可恢复
 - **更新日志**：程序内可直接查看
+- **🆕 GitHub 登录**（v2.0）：内置设备码登录，可**检查更新并自动下载新版本**，
+  以及**手机 ↔ 电脑同步打卡记录**（并集合并，两边记录都保留）。见 [GITHUB_SETUP.md](GITHUB_SETUP.md)
 
 ---
 
@@ -46,6 +44,7 @@
 ├─ Schedule.xlsx              课表（两个平台共用，日程数据源）
 ├─ 学习规划.md                 完整自学规划：时间安排、五阶段路线图、执行建议
 ├─ caie-video-resources.md    配套教学视频资源清单
+├─ GITHUB_SETUP.md            启用 GitHub 登录 / 同步 / 自动更新的一次性配置
 ├─ _plan/                     课表生成脚本（课程目录 + 排课引擎）
 │
 ├─ StudyCompanion/            Windows 桌面版

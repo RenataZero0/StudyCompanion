@@ -1,4 +1,7 @@
 # Build StudyCompanion.apk  (no Gradle / no Android Studio needed)
+#
+# NOTE: build-tools 34.0.0 ships a d8 that crashes with an internal NullPointerException
+#       on classes nested two levels deep (e.g. MainActivity). 35+ is fine -> use 36.0.0.
 # Usage: powershell -ExecutionPolicy Bypass -File build.ps1
 #
 # NOTE: keep this file ASCII-only. PowerShell 5.1 decodes .ps1 as ANSI when there
@@ -7,7 +10,7 @@ $ErrorActionPreference = "Stop"
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SDK  = "D:\android-sdk"
-$BT   = "$SDK\build-tools\34.0.0"
+$BT   = "$SDK\build-tools\36.0.0"
 $AJAR = "$SDK\platforms\android-34\android.jar"
 $JDK  = "D:\Program Files\Java\jdk-21"
 
