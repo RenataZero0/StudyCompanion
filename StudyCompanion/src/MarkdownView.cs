@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Text;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
@@ -29,6 +30,8 @@ namespace StudyCompanion
             public int Height;
 
             // ---- 表格 ----
+            public bool Para;                 // 普通段落（续行要接到它后面）
+            public string Marker;             // 有序列表的序号（无序列表留 null，画圆点）
             public bool Table;
             public List<string[]> Rows;       // Rows[0] 是表头
             public int[] ColW;                // 每列宽度（含内边距）
@@ -169,6 +172,14 @@ namespace StudyCompanion
                     Add(Plain(l.Substring(2)), Ui.F(10f), BodyInk, Ui.Px(3), Ui.Px(12), true, false);
                     continue;
                 }
+                // 有序列表 1. 2. 3. —— 不识别的话后面的项会被当成续行吸收掉
+                var om = System.Text.RegularExpressions.Regex.Match(l, @"^(\d{1,3})\.\s+(.*)$");
+                if (om.Success)
+                {
+                    Add(Plain(om.Groups[2].Value), Ui.F(10f), BodyInk, Ui.Px(3), Ui.Px(12), true, false);
+                    _blocks[_blocks.Count - 1].Marker = om.Groups[1].Value + ".";
+                    continue;
+                }
                 if (l.StartsWith("> "))
                 {
                     Add(Plain(l.Substring(2)), Ui.F(9.5f), Ui.Sub, Ui.Px(4), Ui.Px(12), false, false);
@@ -176,7 +187,15 @@ namespace StudyCompanion
                 }
                 if (l.Length == 0) { Add("", Ui.F(6f), Ui.Sub, Ui.Px(4), 0, false, false); continue; }
 
+                // lazy continuation：没有块标记的行接到上一段 / 列表项后面
+                var prev = _blocks.Count > 0 ? _blocks[_blocks.Count - 1] : null;
+                if (prev != null && (prev.Para || prev.Bullet))
+                {
+                    prev.Text = Join(prev.Text, Plain(l));
+                    continue;
+                }
                 Add(Plain(l), Ui.F(10f), BodyInk, Ui.Px(2), 0, false, false);
+                _blocks[_blocks.Count - 1].Para = true;
                 first = false;
             }
             Measure();
@@ -184,7 +203,27 @@ namespace StudyCompanion
 
         static string Plain(string s)
         {
-            return s.Replace("**", "").Replace("`", "");
+            string t = s.Replace("**", "").Replace("`", "");
+            // 过滤控制字符（制表符除外）—— 源文件里混进退格符时，
+            // 渲染出来像是少了个字母，很难查。
+            var sb = new StringBuilder(t.Length);
+            foreach (char c in t) if (c >= 32 || c == '\t') sb.Append(c);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 把续行接到上一段后面。中文之间直接接，英文/数字之间补一个空格。
+        /// Markdown 里这叫 lazy continuation —— 列表项在源码中换行时，
+        /// 第二行没有 "- " 前缀，但仍然是同一个列表项。
+        /// </summary>
+        static string Join(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a)) return b;
+            if (string.IsNullOrEmpty(b)) return a;
+            char x = a[a.Length - 1], y = b[0];
+            bool ax = x < 128, by = y < 128;
+            if (ax && by && x != ' ' && y != ' ') return a + " " + b;
+            return a + b;
         }
 
         /// <summary>是不是 --- / *** / ___ 这种分隔线</summary>
@@ -359,7 +398,7 @@ namespace StudyCompanion
                         y += b.Height;
                         continue;
                     }
-                    int ind = b.Indent + (b.Bullet ? Ui.Px(16) : 0);
+                    int ind = b.Indent + (b.Bullet ? (b.Marker == null ? Ui.Px(16) : Ui.Px(26)) : 0);
                     b.Lines = Wrap(g, b.Text, b.Font, w - ind);
                     int lh = (int)Math.Ceiling(b.Font.GetHeight(g) * (b.Code ? 1.15f : 1.42f));
                     b.Height = b.Lines.Count * lh + b.Gap;
@@ -433,9 +472,19 @@ namespace StudyCompanion
                 }
                 if (blk.Bullet)
                 {
-                    using (var b = new SolidBrush(ColorTranslator.FromHtml("#9AA6B8")))
-                        g.FillEllipse(b, x + Ui.Px(3), top + lh / 2 - Ui.Px(2), Ui.Px(4), Ui.Px(4));
-                    x += Ui.Px(16);
+                    if (blk.Marker == null)
+                    {
+                        using (var b = new SolidBrush(ColorTranslator.FromHtml("#9AA6B8")))
+                            g.FillEllipse(b, x + Ui.Px(3), top + lh / 2 - Ui.Px(2), Ui.Px(4), Ui.Px(4));
+                        x += Ui.Px(16);
+                    }
+                    else
+                    {
+                        using (var b = new SolidBrush(ColorTranslator.FromHtml("#9AA6B8")))
+                        using (var mf = new Font(blk.Font, FontStyle.Bold))
+                            g.DrawString(blk.Marker, mf, b, x, top);
+                        x += Ui.Px(26);
+                    }
                 }
                 if (blk.Code)
                 {

@@ -51,6 +51,10 @@ public class DocActivity extends Activity {
 
         /** 项目符号占的横向空间（画的时候也是这个值） */
         static final int BULLET_INDENT = 14;
+        /** 有序列表序号占的横向空间 */
+        static final int ORDER_INDENT = 24;
+        static final java.util.regex.Pattern ORDERED =
+                java.util.regex.Pattern.compile("^(\\d{1,3})\\.\\s+(.*)$", java.util.regex.Pattern.DOTALL);
 
         private final List<Blk> blocks = new ArrayList<Blk>();
         private float scroll = 0, contentH = 0;
@@ -75,7 +79,8 @@ public class DocActivity extends Activity {
             String text = "";
             Paint paint;
             int gapTop, gapBot, indent;
-            boolean bullet, code, divider, spacer, ruleBar;
+            boolean bullet, code, divider, spacer, ruleBar, para;
+            String marker;          // 有序列表的序号文字（无序列表留 null，画圆点）
 
             float y, h;
 
@@ -159,7 +164,32 @@ public class DocActivity extends Activity {
         }
 
         // ---------------------------------------------------------- 解析
-        static String plain(String s) { return s.replace("**", "").replace("`", ""); }
+        static String plain(String s) {
+            String t = s.replace("**", "").replace("`", "");
+            // 过滤掉控制字符（制表符除外）。曾经有一次源文件里混进了退格符 U+0008，
+            // 渲染出来像是少了一个字母，查了半天才发现是文件坏了。
+            StringBuilder sb = null;
+            for (int i = 0; i < t.length(); i++) {
+                char c = t.charAt(i);
+                if (c < 32 && c != '\t') {
+                    if (sb == null) sb = new StringBuilder(t.substring(0, i));
+                } else if (sb != null) sb.append(c);
+            }
+            return sb == null ? t : sb.toString();
+        }
+
+        /**
+         * 把续行接到上一段后面。中文之间直接接，英文/数字之间补一个空格 ——
+         * 不然 "build" + ".ps1" 会粘成 "build.ps1" 少个空格，反之中文会多出空格。
+         */
+        static String join(String a, String b) {
+            if (a == null || a.length() == 0) return b;
+            if (b == null || b.length() == 0) return a;
+            char x = a.charAt(a.length() - 1), y = b.charAt(0);
+            boolean ax = x < 128, by = y < 128;
+            if (ax && by && x != ' ' && y != ' ') return a + " " + b;
+            return a + b;
+        }
 
         Blk mk(Paint p, int gapTop, int gapBot, int indent) {
             Blk b = new Blk();
@@ -272,6 +302,16 @@ public class DocActivity extends Activity {
                     blocks.add(b);
                     continue;
                 }
+                java.util.regex.Matcher om = ORDERED.matcher(l);
+                if (om.matches()) {
+                    // 有序列表：序号当标记画，不能让它掉进下面的续行分支被吸收
+                    Blk b = mk(Ui.font(12.5f, false, Ui.TEXT_BODY), 0, Ui.px(GAP_BULLET), Ui.px(6));
+                    b.text = plain(om.group(2));
+                    b.marker = om.group(1) + ".";
+                    b.bullet = true;
+                    blocks.add(b);
+                    continue;
+                }
                 if (l.startsWith("> ")) {
                     Blk b = mk(Ui.font(12, false, Ui.SUB), 2, Ui.px(GAP_PARA), Ui.px(10));
                     b.text = plain(l.substring(2)); b.ruleBar = true;
@@ -289,7 +329,18 @@ public class DocActivity extends Activity {
                     blocks.add(b);
                     continue;
                 }
-                add(plain(l), Ui.font(12.5f, false, Ui.TEXT_BODY), 0, Ui.px(GAP_PARA), 0);
+                // lazy continuation：这一行没有块标记，就接到上一段 / 列表项后面。
+                // 不这么做的话，列表项在源码里换行的部分会掉到最左边，看着很乱。
+                Blk prev = blocks.isEmpty() ? null : blocks.get(blocks.size() - 1);
+                if (prev != null && (prev.para || prev.bullet || prev.ruleBar))
+                {
+                    prev.text = join(prev.text, plain(l));
+                    continue;
+                }
+                Blk nb = mk(Ui.font(12.5f, false, Ui.TEXT_BODY), 0, Ui.px(GAP_PARA), 0);
+                nb.text = plain(l);
+                nb.para = true;
+                blocks.add(nb);
                 first = false;
             }
         }
@@ -366,7 +417,7 @@ public class DocActivity extends Activity {
                 }
                 // 列表项的文字是从项目符号右边开始的，换行宽度必须把那段缩进也扣掉，
                 // 否则续行会比可用宽度还长，看起来像是另一段
-                float extra = b.bullet ? BULLET_INDENT : 0;
+                float extra = b.bullet ? (b.marker == null ? BULLET_INDENT : ORDER_INDENT) : 0;
                 b.lines = Ui.wrap(b.paint, b.text, w - b.indent - extra);
                 Paint.FontMetrics fm = b.paint.getFontMetrics();
                 float lh = (fm.descent - fm.ascent) * (b.code ? 1.2f : 1.52f);
@@ -485,10 +536,15 @@ public class DocActivity extends Activity {
                     Ui.roundRect(c, x - Ui.px(10), top, x - Ui.px(6), top + b.h, Ui.px(2), Ui.LINE);
                 }
                 if (b.bullet) {
-                    Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
-                    dot.setColor(Ui.TEXT_DIM);
-                    c.drawCircle(x + Ui.px(3), top + lh * 0.55f, Ui.px(2.6f), dot);
-                    x += Ui.px(BULLET_INDENT);
+                    if (b.marker == null) {
+                        Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+                        dot.setColor(Ui.TEXT_DIM);
+                        c.drawCircle(x + Ui.px(3), top + lh * 0.55f, Ui.px(2.6f), dot);
+                        x += Ui.px(BULLET_INDENT);
+                    } else {
+                        Ui.text(c, b.marker, x, top - fm.ascent, Ui.font(12.5f, true, Ui.TEXT_DIM));
+                        x += Ui.px(ORDER_INDENT);
+                    }
                 }
                 if (b.code) {
                     Ui.roundRect(c, textLeft(), top - Ui.px(3), textLeft() + textWidth(),
