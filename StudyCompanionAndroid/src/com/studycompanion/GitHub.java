@@ -1,4 +1,4 @@
-﻿package com.studycompanion;
+package com.studycompanion;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -18,22 +18,22 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 
 /**
- * GitHub 闆嗘垚锛氳澶囩爜鐧诲綍 + REST API銆?
+ * GitHub 集成：设备码登录 + REST API。
  *
- * 鈿狅笍 CLIENT_ID 闇€瑕佸厛鍦?GitHub 娉ㄥ唽涓€涓?OAuth App锛堝嬀閫?Enable Device Flow锛夛紝
- *    鎶婃嬁鍒扮殑 Client ID 濉湪涓嬮潰銆傝澶囩爜娴佺▼涓嶉渶瑕?client_secret锛屾墍浠ユ斁鍦ㄥ鎴风鏄畨鍏ㄧ殑銆?
+ * ⚠️ CLIENT_ID 需要先在 GitHub 注册一个 OAuth App（勾选 Enable Device Flow），
+ *    把拿到的 Client ID 填在下面。设备码流程不需要 client_secret，所以放在客户端是安全的。
  */
 public class GitHub {
 
-    /** OAuth App 鐨?Client ID锛堣澶囩爜娴佺▼涓嶉渶瑕?client_secret锛?*/
+    /** OAuth App 的 Client ID（设备码流程不需要 client_secret） */
     public static final String CLIENT_ID = "Ov23limNvMWKQQ3qKGD1";
 
     public static final String OWNER = "RenataZero0";
     public static final String REPO = "StudyCompanion";
-    /** repo 鏉冮檺锛氳绉佹湁浠撳簱鍐呭 + 鍐欏悓姝ユ枃浠?*/
+    /** repo 权限：读私有仓库内容 + 写同步文件 */
     public static final String SCOPE = "repo";
 
-    /** 鏈?APK 瀵瑰簲鐨?Release 鏍囩銆傛瘡娆″彂鐗堟椂涓?Release 涓€璧锋敼锛岀敤浜庡垽鏂湁娌℃湁鏂扮増銆?*/
+    /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
     public static final String VERSION_TAG = "v2.1.7";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
@@ -42,7 +42,7 @@ public class GitHub {
     public static final String VERIFY_URL = "https://github.com/login/device";
 
     public static final String SYNC_PATH = "sync/progress.txt";
-    /** 鎵撳崱璁板綍鐨?CSV 涔熶細鑷姩浼犲埌杩欓噷锛屼笉鐢ㄥ湪鎵嬫満涓婃墜鍔ㄥ鍑?*/
+    /** 打卡记录的 CSV 也会自动传到这里，不用在手机上手动导出 */
     public static final String CSV_PATH = "sync/StudyRecord.csv";
 
     private static final int TIMEOUT = 20000;
@@ -51,11 +51,11 @@ public class GitHub {
         return CLIENT_ID != null && CLIENT_ID.length() > 10 && !CLIENT_ID.startsWith("PUT_");
     }
 
-    // ================================================================== 浠ょ墝
+    // ================================================================== 令牌
     /**
-     * 鏁板€兼瘮杈冪増鏈彿锛歛 &gt; b 杩斿洖 1锛岀浉绛?0锛宎 &lt; b 杩斿洖 -1銆?
-     * 涓嶈兘鍙垽鏂€岀浉涓嶇浉绛夈€嶁€斺€?閭ｆ牱杩滅鐗堟湰姣旀湰鏈烘棫鏃朵篃浼氳褰撴垚鏈夋柊鐗堟湰銆?
-     * 椤轰究涔熶慨鎺?2.1.10 &lt; 2.1.9 杩欑瀛楃涓叉瘮杈冪殑鍧戙€?
+     * 数值比较版本号：a &gt; b 返回 1，相等 0，a &lt; b 返回 -1。
+     * 不能只判断「相不相等」—— 那样远端版本比本机旧时也会被当成有新版本。
+     * 顺便也修掉 2.1.10 &lt; 2.1.9 这种字符串比较的坑。
      */
     public static int compareVersion(String a, String b) {
         int[] pa = parseVer(a), pb = parseVer(b);
@@ -135,7 +135,7 @@ public class GitHub {
 
     static String trim(String s) {
         s = s.replace("\n", " ").replace("\r", " ");
-        return s.length() > 220 ? s.substring(0, 220) + "鈥? : s;
+        return s.length() > 220 ? s.substring(0, 220) + "…" : s;
     }
 
     static String form(String... kv) throws Exception {
@@ -147,15 +147,15 @@ public class GitHub {
         return sb.toString();
     }
 
-    // ================================================================== 璁惧鐮佹祦绋?
+    // ================================================================== 设备码流程
     public static class DeviceCode {
         public String deviceCode = "", userCode = "", verifyUrl = VERIFY_URL;
         public int interval = 5, expiresIn = 900;
     }
 
-    /** 绗竴姝ワ細鍚?GitHub 瑕佷竴涓敤鎴风爜 */
+    /** 第一步：向 GitHub 要一个用户码 */
     public static DeviceCode deviceStart() throws Exception {
-        if (!configured()) throw new Exception("杩樻病鏈夊～鍏?OAuth App 鐨?Client ID");
+        if (!configured()) throw new Exception("还没有填入 OAuth App 的 Client ID");
         String body = form("client_id", CLIENT_ID, "scope", SCOPE);
         HttpURLConnection conn = (HttpURLConnection) new URL(DEVICE_CODE_URL).openConnection();
         conn.setRequestMethod("POST");
@@ -182,18 +182,18 @@ public class GitHub {
         dc.verifyUrl = j.optString("verification_uri", VERIFY_URL);
         dc.interval = j.optInt("interval", 5);
         dc.expiresIn = j.optInt("expires_in", 900);
-        if (dc.deviceCode.length() == 0) throw new Exception("GitHub 娌℃湁杩斿洖 device_code锛? + trim(text));
+        if (dc.deviceCode.length() == 0) throw new Exception("GitHub 没有返回 device_code：" + trim(text));
         return dc;
     }
 
-    /** 杞鎹?token銆俢ancel 鐢卞閮ㄧ疆浣嶏紱杩斿洖 access_token */
+    /** 轮询换 token。cancel 由外部置位；返回 access_token */
     public static String devicePoll(DeviceCode dc, Cancel cancel) throws Exception {
         long deadline = System.currentTimeMillis() + dc.expiresIn * 1000L;
         int interval = Math.max(5, dc.interval);
         while (System.currentTimeMillis() < deadline) {
-            if (cancel != null && cancel.cancelled()) throw new Exception("宸插彇娑?);
+            if (cancel != null && cancel.cancelled()) throw new Exception("已取消");
             sleep(interval * 1000L);
-            if (cancel != null && cancel.cancelled()) throw new Exception("宸插彇娑?);
+            if (cancel != null && cancel.cancelled()) throw new Exception("已取消");
 
             String body = form("client_id", CLIENT_ID, "device_code", dc.deviceCode,
                     "grant_type", "urn:ietf:params:oauth:grant-type:device_code");
@@ -201,19 +201,19 @@ public class GitHub {
             try {
                 text = postForm(TOKEN_URL, body);
             } catch (Exception e) {
-                continue;               // 缃戠粶鎶栧姩灏卞啀璇?
+                continue;               // 网络抖动就再试
             }
             JSONObject j = new JSONObject(text);
             String err = j.optString("error", "");
             if ("authorization_pending".equals(err)) continue;
             if ("slow_down".equals(err)) { interval += 5; continue; }
-            if ("expired_token".equals(err)) throw new Exception("浠ｇ爜宸茶繃鏈燂紝璇烽噸鏂扮櫥褰?);
-            if ("access_denied".equals(err)) throw new Exception("浣犲湪椤甸潰涓婄偣浜嗗彇娑?);
-            if (err.length() > 0) throw new Exception("GitHub 杩斿洖锛? + err);
+            if ("expired_token".equals(err)) throw new Exception("代码已过期，请重新登录");
+            if ("access_denied".equals(err)) throw new Exception("你在页面上点了取消");
+            if (err.length() > 0) throw new Exception("GitHub 返回：" + err);
             String tok = j.optString("access_token", "");
             if (tok.length() > 0) return tok;
         }
-        throw new Exception("绛夊緟瓒呮椂锛岃閲嶆柊鐧诲綍");
+        throw new Exception("等待超时，请重新登录");
     }
 
     static String postForm(String url, String body) throws Exception {
@@ -244,8 +244,8 @@ public class GitHub {
     }
 
     // ------------------------------------------------------------------ TLS
-    // Android 5.0+ 榛樿灏卞惎鐢?TLS1.2锛屼絾灏戞暟鑰佹満鍨?瀹氬埗 ROM 浼氭妸瀹冨叧鎺夛紝
-    // GitHub 鍙帴鍙?TLS1.2+锛屾墍浠ヨ繖閲屾樉寮忔寚瀹氫竴娆★紙鎷夸笉鍒板氨閫€鍥炵郴缁熼粯璁わ級銆?
+    // Android 5.0+ 默认就启用 TLS1.2，但少数老机型/定制 ROM 会把它关掉，
+    // GitHub 只接受 TLS1.2+，所以这里显式指定一次（拿不到就退回系统默认）。
     private static javax.net.ssl.SSLSocketFactory TLS12;
     private static boolean TLS_TRIED;
 
@@ -273,12 +273,12 @@ public class GitHub {
         return new JSONObject(request("PUT", API + path, json, token(c), "application/vnd.github+json"));
     }
 
-    /** 鍙栧綋鍓嶇櫥褰曠敤鎴凤紝椤哄甫楠岃瘉 token 鏄惁杩樻湁鏁?*/
+    /** 取当前登录用户，顺带验证 token 是否还有效 */
     public static String currentUser(Context c) throws Exception {
         return api(c, "/user").optString("login", "");
     }
 
-    /** 鐢ㄦ寚瀹?token 鍙栫敤鎴蜂俊鎭紙鍒氱櫥褰曘€佽繕娌″瓨涓嬫潵鏃剁敤锛?*/
+    /** 用指定 token 取用户信息（刚登录、还没存下来时用） */
     public static String currentUserWith(Context c, String token) {
         try {
             return new JSONObject(request("GET", API + "/user", null, token,
@@ -288,20 +288,20 @@ public class GitHub {
 
     public static class Release {
         public String tag = "", name = "", notes = "", pageUrl = "";
-        /** 璧?API 鐨勪笅杞藉湴鍧€锛岃浠ょ墝锛堢鏈変粨搴?/ 宸茬櫥褰曟椂鐢級 */
+        /** 走 API 的下载地址，要令牌（私有仓库 / 已登录时用） */
         public String apkUrl = "", exeUrl = "";
-        /** 娴忚鍣ㄧ洿閾撅紝鍏紑浠撳簱鏃朵笉鐢ㄧ櫥褰曚篃鑳戒笅 */
+        /** 浏览器直链，公开仓库时不用登录也能下 */
         public String apkBrowser = "", exeBrowser = "";
         public long apkSize = 0, exeSize = 0;
 
-        /** 鎸戜竴涓兘鐢ㄧ殑涓嬭浇鍦板潃 */
+        /** 挑一个能用的下载地址 */
         public String apkDownload(boolean loggedIn) {
             if (loggedIn && apkUrl.length() > 0) return apkUrl;
             return apkBrowser.length() > 0 ? apkBrowser : apkUrl;
         }
     }
 
-    /** 鏈€鏂?Release銆備粨搴撳叕寮€鏃朵笉闇€瑕佺櫥褰?*/
+    /** 最新 Release。仓库公开时不需要登录 */
     public static Release latestRelease(Context c) throws Exception {
         JSONObject j = api(c, "/repos/" + OWNER + "/" + REPO + "/releases/latest");
         Release r = new Release();
@@ -327,7 +327,7 @@ public class GitHub {
         return r;
     }
 
-    /** 璇诲彇浠撳簱閲岀殑鏂囨湰鏂囦欢锛岃繑鍥?null 琛ㄧず鏂囦欢涓嶅瓨鍦?*/
+    /** 读取仓库里的文本文件，返回 null 表示文件不存在 */
     public static String readFile(Context c, String path) throws Exception {
         try {
             JSONObject j = api(c, "/repos/" + OWNER + "/" + REPO + "/contents/" + path);
@@ -341,7 +341,7 @@ public class GitHub {
         }
     }
 
-    /** 璇诲彇鏂囦欢鐨?sha锛堟洿鏂版椂闇€瑕佸甫涓婏級锛屼笉瀛樺湪杩斿洖 null */
+    /** 读取文件的 sha（更新时需要带上），不存在返回 null */
     public static String fileSha(Context c, String path) {
         try {
             JSONObject j = api(c, "/repos/" + OWNER + "/" + REPO + "/contents/" + path);
@@ -361,11 +361,11 @@ public class GitHub {
     }
 
     /**
-     * 涓嬭浇 release 璧勬簮锛岃嚜鍔ㄨ窡闅忛噸瀹氬悜銆?
+     * 下载 release 资源，自动跟随重定向。
      *
-     * 娉ㄦ剰锛欰PI 璧勬簮鍦板潃锛坅pi.github.com/repos/.../releases/assets/xxx锛?*蹇呴』**甯︿护鐗岋紝
-     * 鍖垮悕璁块棶浼?404锛涙祻瑙堝櫒鐩撮摼锛坓ithub.com/.../releases/download/...锛夊垯涓嶉渶瑕佷护鐗屻€?
-     * 浠撳簱鍏紑鏃朵笉鐧诲綍涔熻蛋鍚庤€咃紝鎵€浠ヨ繖閲屽彧瀵?api.github.com 鍔?Authorization 澶淬€?
+     * 注意：API 资源地址（api.github.com/repos/.../releases/assets/xxx）**必须**带令牌，
+     * 匿名访问会 404；浏览器直链（github.com/.../releases/download/...）则不需要令牌。
+     * 仓库公开时不登录也走后者，所以这里只对 api.github.com 加 Authorization 头。
      */
     public static void downloadAsset(Context c, String url, java.io.File out,
                                      Progress p) throws Exception {
@@ -389,7 +389,7 @@ public class GitHub {
             applyTls(conn);
             code = conn.getResponseCode();
         }
-        if (code < 200 || code >= 300) throw new Exception("涓嬭浇澶辫触 HTTP " + code);
+        if (code < 200 || code >= 300) throw new Exception("下载失败 HTTP " + code);
         long total = conn.getContentLength();
         InputStream in = conn.getInputStream();
         java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
@@ -408,7 +408,7 @@ public class GitHub {
 
     public interface Progress { void onProgress(long got, long total); }
 
-    /** 浠?tag锛堝 v1.9锛夐噷鍙栧嚭鐗堟湰鍙凤紝鐢ㄤ簬姣旇緝 */
+    /** 从 tag（如 v1.9）里取出版本号，用于比较 */
     public static int versionCode(String tag) {
         if (tag == null) return 0;
         StringBuilder sb = new StringBuilder();

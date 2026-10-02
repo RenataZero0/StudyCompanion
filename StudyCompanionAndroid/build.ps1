@@ -33,6 +33,12 @@ if ($ghjava -match 'VERSION_TAG\s*=\s*"v?(\d+)\.(\d+)(?:\.(\d+))?"') {
 }
 Write-Host ("version: {0}  (versionCode {1})" -f $verName, $verCode)
 
+# Drop the previous APK up front: if any later step fails we must not leave a
+# stale package behind that looks like a successful build.
+$apkPath = "$here\StudyCompanion.apk"
+if (Test-Path $apkPath) { Remove-Item $apkPath -Force }
+
+
 # CHANGELOG.md lives at the repo root. Copy it into assets as the offline fallback;
 # at runtime the app prefers the copy it fetched from GitHub.
 $cl = Join-Path (Split-Path -Parent $here) "CHANGELOG.md"
@@ -96,8 +102,7 @@ if (-not (Test-Path $ks)) {
         -dname "CN=StudyCompanion, OU=Dev, O=StudyCompanion, L=Shanghai, C=CN"
     if ($LASTEXITCODE -ne 0) { throw "keytool failed" }
 }
-$apk = "$here\StudyCompanion.apk"
-if (Test-Path $apk) { Remove-Item $apk -Force }
+$apk = $apkPath
 & "$BT\apksigner.bat" sign `
     --ks $ks --ks-pass pass:android --key-pass pass:android `
     --v1-signing-enabled true --v2-signing-enabled true `
@@ -106,4 +111,12 @@ if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
 
 Write-Host ""
 Write-Host "OK -> $apk" -ForegroundColor Green
+# Guard: verify the produced APK really carries the version we intended.
+# (Once javac failed silently behind a filtered log and the APK stayed stale.)
+$badged = & "$BT\aapt2.exe" dump badging $apk 2>&1 | Select-Object -First 1
+if ($badged -notmatch [regex]::Escape("versionName='$verName'")) {
+    Write-Host "!! APK version mismatch (expected $verName)" -ForegroundColor Red
+    Write-Host "   $badged" -ForegroundColor Red
+    throw "APK version check failed"
+}
 Write-Host ("size: {0:N0} KB" -f ((Get-Item $apk).Length / 1KB))
