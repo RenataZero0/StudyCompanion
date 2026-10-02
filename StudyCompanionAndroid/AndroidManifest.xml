@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.studycompanion"
-    android:versionCode="1"
-    android:versionName="1.0">
+    package="com.studycompanion">
 
+    <!-- ⚠️ INTERNET 是必须的！之前漏了这一行，导致安卓端所有网络功能都报
+         "Permission denied (missing INTERNET permission?)"：登录 GitHub、同步、检查更新全部不可用。
+         桌面版没有这个概念，所以一直没意识到。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />

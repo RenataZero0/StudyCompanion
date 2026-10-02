@@ -34,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.0.5";
+    public static final String VERSION_TAG = "v2.0.6";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -258,11 +258,21 @@ public class GitHub {
     }
 
     public static class Release {
-        public String tag = "", name = "", notes = "", apkUrl = "", exeUrl = "", pageUrl = "";
+        public String tag = "", name = "", notes = "", pageUrl = "";
+        /** 走 API 的下载地址，要令牌（私有仓库 / 已登录时用） */
+        public String apkUrl = "", exeUrl = "";
+        /** 浏览器直链，公开仓库时不用登录也能下 */
+        public String apkBrowser = "", exeBrowser = "";
         public long apkSize = 0, exeSize = 0;
+
+        /** 挑一个能用的下载地址 */
+        public String apkDownload(boolean loggedIn) {
+            if (loggedIn && apkUrl.length() > 0) return apkUrl;
+            return apkBrowser.length() > 0 ? apkBrowser : apkUrl;
+        }
     }
 
-    /** 最新 Release（私有仓库需要 token） */
+    /** 最新 Release。仓库公开时不需要登录 */
     public static Release latestRelease(Context c) throws Exception {
         JSONObject j = api(c, "/repos/" + OWNER + "/" + REPO + "/releases/latest");
         Release r = new Release();
@@ -276,8 +286,13 @@ public class GitHub {
                 JSONObject a = arr.optJSONObject(i);
                 if (a == null) continue;
                 String n = a.optString("name", "");
-                if (n.endsWith(".apk")) { r.apkUrl = a.optString("url", ""); r.apkSize = a.optLong("size", 0); }
-                else if (n.endsWith(".exe")) { r.exeUrl = a.optString("url", ""); r.exeSize = a.optLong("size", 0); }
+                String api = a.optString("url", "");
+                String br = a.optString("browser_download_url", "");
+                if (n.endsWith(".apk")) {
+                    r.apkUrl = api; r.apkBrowser = br; r.apkSize = a.optLong("size", 0);
+                } else if (n.endsWith(".exe")) {
+                    r.exeUrl = api; r.exeBrowser = br; r.exeSize = a.optLong("size", 0);
+                }
             }
         }
         return r;
@@ -316,15 +331,22 @@ public class GitHub {
         apiPut(c, "/repos/" + OWNER + "/" + REPO + "/contents/" + path, body.toString());
     }
 
-    /** 下载 release 资源（需要 token，会跟随重定向） */
-    public static void downloadAsset(Context c, String assetApiUrl, java.io.File out,
+    /**
+     * 下载 release 资源，自动跟随重定向。
+     *
+     * 注意：API 资源地址（api.github.com/repos/.../releases/assets/xxx）**必须**带令牌，
+     * 匿名访问会 404；浏览器直链（github.com/.../releases/download/...）则不需要令牌。
+     * 仓库公开时不登录也走后者，所以这里只对 api.github.com 加 Authorization 头。
+     */
+    public static void downloadAsset(Context c, String url, java.io.File out,
                                      Progress p) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(assetApiUrl).openConnection();
+        boolean needsAuth = url != null && url.contains("api.github.com");
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setInstanceFollowRedirects(false);
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(60000);
         conn.setRequestProperty("Accept", "application/octet-stream");
-        conn.setRequestProperty("Authorization", "Bearer " + token(c));
+        if (needsAuth) conn.setRequestProperty("Authorization", "Bearer " + token(c));
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
         applyTls(conn);
         int code = conn.getResponseCode();

@@ -128,6 +128,44 @@ powershell -ExecutionPolicy Bypass -File selftest.ps1
 
 ---
 
+## v2.0.6 改动（含一个严重修复）
+
+### 🔴 修复：漏了 INTERNET 权限，安卓端所有网络功能都不可用
+
+登录 GitHub 时报：
+
+> 登录失败：Permission denied (missing INTERNET permission?)
+
+**AndroidManifest.xml 里从来没有声明 `android.permission.INTERNET`。**
+桌面版没有这个概念，所以一直没意识到 —— 结果安卓端的登录、同步、检查更新全部用不了。
+
+现已补上 `INTERNET` 与 `ACCESS_NETWORK_STATE`，实测设备码请求成功、浏览器正常唤起。
+
+### 版本号终于对得上了
+
+之前 manifest 里写死 `versionCode=1 / versionName=1.0`，所以每次安装都显示 1.0、覆盖安装也没法判断新旧。
+
+现在 `build.ps1` 会**从 `GitHub.java` 的 `VERSION_TAG` 自动推导**：
+
+| VERSION_TAG | versionName | versionCode |
+|---|---|---|
+| v2.0.6 | 2.0.6 | 20006 |
+
+### 启动时自动检查更新
+
+仓库公开后不需要登录就能查。每次打开（每天最多一次）自动查一次，
+发现新版弹窗提示，可直接下载安装；查不到就静默跳过。
+
+### 底部按钮栏重新设计
+
+原来是三块纯文字，比较简陋。现在改成三个圆角按钮，各带一个用 Canvas 画的图标：
+
+```
+[ 📅 月历 ]   [ 📊 统计 ]   [ 🎚 设置 ]
+```
+
+---
+
 ## v2.0.5 改动
 
 ### 1. 日历 / 学习统计 / 设置与工具 从主界面挪走（手机端）

@@ -49,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.0.5";
+        public const string VersionTag = "v2.0.6";
 
         public const string SyncPath = "sync/progress.txt";
         /// <summary>打卡记录的 CSV 也会自动传到这里，不用手动导出</summary>
@@ -296,8 +296,19 @@ namespace StudyCompanion
         // ============================================================== Release
         public class Release
         {
-            public string Tag = "", Name = "", Notes = "", ApkUrl = "", ExeUrl = "", PageUrl = "";
+            public string Tag = "", Name = "", Notes = "", PageUrl = "";
+            /// <summary>走 API 的下载地址，要令牌</summary>
+            public string ApkUrl = "", ExeUrl = "";
+            /// <summary>浏览器直链，公开仓库不登录也能下</summary>
+            public string ApkBrowser = "", ExeBrowser = "";
             public long ApkSize, ExeSize;
+
+            /// <summary>挑一个能用的下载地址</summary>
+            public string ExeDownload(bool loggedIn)
+            {
+                if (loggedIn && ExeUrl.Length > 0) return ExeUrl;
+                return ExeBrowser.Length > 0 ? ExeBrowser : ExeUrl;
+            }
         }
 
         public static Release LatestRelease()
@@ -322,10 +333,12 @@ namespace StudyCompanion
                         var m = a as Dictionary<string, object>;
                         if (m == null) continue;
                         string n = Str(m, "name");
+                        string api = Str(m, "url");
+                        string br = Str(m, "browser_download_url");
                         if (n.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
-                        { rel.ApkUrl = Str(m, "url"); rel.ApkSize = Long(m, "size"); }
+                        { rel.ApkUrl = api; rel.ApkBrowser = br; rel.ApkSize = Long(m, "size"); }
                         else if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                        { rel.ExeUrl = Str(m, "url"); rel.ExeSize = Long(m, "size"); }
+                        { rel.ExeUrl = api; rel.ExeBrowser = br; rel.ExeSize = Long(m, "size"); }
                     }
                 }
             }
@@ -368,9 +381,12 @@ namespace StudyCompanion
 
         // ============================================================== 下载
         /// <summary>下载 release 资源。onProgress(已下载, 总大小)，总大小未知时为 -1</summary>
-        public static void Download(string assetApiUrl, string outPath, Action<long, long> onProgress)
+        public static void Download(string url, string outPath, Action<long, long> onProgress)
         {
-            var r = Req("GET", assetApiUrl, Token, "application/octet-stream");
+            // API 资源地址匿名访问会 404，只有它才需要带令牌；
+            // 浏览器直链（github.com/.../releases/download/...）不需要
+            bool needsAuth = url != null && url.Contains("api.github.com");
+            var r = Req("GET", url, needsAuth ? Token : null, "application/octet-stream");
             r.AllowAutoRedirect = true;
             using (var resp = (HttpWebResponse)r.GetResponse())
             using (var s = resp.GetResponseStream())

@@ -297,7 +297,7 @@ namespace StudyCompanion
                             SetLog("已是最新版本。\n当前：" + GitHub.VersionTag + "　最新：" + rel.Tag);
                             return;
                         }
-                        if (string.IsNullOrEmpty(rel.ExeUrl))
+                        if (string.IsNullOrEmpty(rel.ExeDownload(GitHub.LoggedIn)))
                         {
                             SetLog("最新版是 " + rel.Tag + "，但这个 Release 里没有 exe 附件。");
                             return;
@@ -346,7 +346,7 @@ namespace StudyCompanion
             {
                 try
                 {
-                    GitHub.Download(rel.ExeUrl, tmp, delegate (long got, long total)
+                    GitHub.Download(rel.ExeDownload(GitHub.LoggedIn), tmp, delegate (long got, long total)
                     {
                         int pct = total > 0 ? (int)(got * 100 / total) : -1;
                         try

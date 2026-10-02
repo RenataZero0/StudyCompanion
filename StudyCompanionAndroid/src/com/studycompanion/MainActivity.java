@@ -58,6 +58,51 @@ public class MainActivity extends Activity implements MainView.Listener {
         if (Store.autoRemind()) Reminder.scheduleAll(this);
 
         showLastCrash();
+        autoCheckUpdate();
+    }
+
+    /**
+     * 启动时自动查一次有没有新版（仓库公开，不需要登录）。
+     * 每天最多查一次，避免每次开都弹；查不到就静默失败，绝不打扰。
+     */
+    private void autoCheckUpdate() {
+        final android.content.SharedPreferences sp =
+                getSharedPreferences("study", MODE_PRIVATE);
+        final String today = ScheduleData.todayIso();
+        if (today.equals(sp.getString("lastUpdateCheck", ""))) return;
+
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    final GitHub.Release rel = GitHub.latestRelease(MainActivity.this);
+                    sp.edit().putString("lastUpdateCheck", today).apply();
+                    if (rel.tag.length() == 0) return;
+                    if (rel.tag.equalsIgnoreCase(GitHub.VERSION_TAG)) return;
+                    if (rel.apkDownload(false).length() == 0) return;
+                    runOnUiThread(new Runnable() {
+                        public void run() { showUpdateDialog(rel); }
+                    });
+                } catch (Exception e) {
+                    // 没网 / 被墙 / 限流都无所谓，静默跳过
+                }
+            }
+        }).start();
+    }
+
+    /** 自动检查发现新版时的提示 */
+    private void showUpdateDialog(final GitHub.Release rel) {
+        new AlertDialog.Builder(this)
+                .setTitle("发现新版本 " + rel.tag)
+                .setMessage("当前：" + GitHub.VERSION_TAG
+                        + "\n大小：" + (rel.apkSize / 1024) + " KB\n\n" + head(rel.notes))
+                .setPositiveButton("下载并安装", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) { downloadApk(rel); }
+                })
+                .setNeutralButton("打开 Release 页", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) { openUrl(rel.pageUrl); }
+                })
+                .setNegativeButton("以后再说", null)
+                .show();
     }
 
     /** 上次崩溃过就把堆栈弹出来 —— 手机上没法看 logcat，这是唯一能拿到线索的办法 */
@@ -370,9 +415,9 @@ public class MainActivity extends Activity implements MainView.Listener {
     // ================================================================== 更新
     @Override
     public void ghCheckUpdate() {
-        if (!GitHub.loggedIn(this)) { toast("请先登录 GitHub"); return; }
+        // 仓库现在是公开的，没登录也能查更新
         busy = new AlertDialog.Builder(this)
-                .setTitle("正在检查更新…").setMessage("读取私有仓库的最新 Release")
+                .setTitle("正在检查更新…").setMessage("读取最新 Release")
                 .setCancelable(false).show();
 
         new Thread(new Runnable() {
@@ -454,7 +499,8 @@ public class MainActivity extends Activity implements MainView.Listener {
                 try {
                     final File out = ApkProvider.fileFor(MainActivity.this,
                             "StudyCompanion-" + rel.tag + ".apk");
-                    GitHub.downloadAsset(MainActivity.this, rel.apkUrl, out, new GitHub.Progress() {
+                    GitHub.downloadAsset(MainActivity.this,
+                            rel.apkDownload(GitHub.loggedIn(MainActivity.this)), out, new GitHub.Progress() {
                         public void onProgress(long got, long total) { updateDownloadText(got, total); }
                     });
                     runOnUiThread(new Runnable() {

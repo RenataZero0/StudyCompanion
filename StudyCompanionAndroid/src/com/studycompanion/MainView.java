@@ -350,13 +350,71 @@ public class MainView extends View {
         float top = H - bottomH;
         Ui.roundRect(c, 0, top, W, H, 0, 0xFFFFFFFF);
         Ui.roundRect(c, 0, top, W, top + 1, 0, Ui.LINE);
-        String[] labels = {"月历", "学习统计", "设置与工具"};
+
+        String[] labels = {"月历", "统计", "设置"};
         int[] actions = {A_OV_CAL, A_OV_STATS, A_OV_TOOLS};
-        float bw = W / 3f;
+        float cellW = W / 3f;
+        float m = Ui.px(10);
+        float ph = Ui.px(36);
+        float py = top + (bottomH - ph) / 2f;
+        Paint pl = Ui.font(12.5f, true, Ui.ACCENT);
+
         for (int i = 0; i < 3; i++) {
-            RectF r = new RectF(i * bw, top, (i + 1) * bw, H);
-            Ui.textC(c, labels[i], r, Ui.font(13, true, Ui.ACCENT));
+            RectF r = new RectF(i * cellW + m, py, (i + 1) * cellW - m, py + ph);
+            Ui.roundRect(c, r, ph / 2, Ui.ACCENT_SOFT);
+
+            float iconS = Ui.px(16);
+            float gap = Ui.px(6);
+            float tw = pl.measureText(labels[i]);
+            float sx = r.centerX() - (iconS + gap + tw) / 2f;
+            float iy = r.centerY() - iconS / 2f;
+            if (i == 0) iconCalendar(c, sx, iy, iconS, Ui.ACCENT);
+            else if (i == 1) iconChart(c, sx, iy, iconS, Ui.ACCENT);
+            else iconSliders(c, sx, iy, iconS, Ui.ACCENT);
+
+            Ui.textV(c, labels[i], sx + iconS + gap, r.centerY(), pl);
             hit(r, actions[i], null, 0);
+        }
+    }
+
+    // 三个小图标都用 Canvas 画，省掉图片资源
+    private void iconCalendar(Canvas c, float x, float y, float s, int color) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(Math.max(1.5f, s * 0.12f));
+        p.setStrokeCap(Paint.Cap.ROUND);
+        p.setColor(color);
+        c.drawRoundRect(new RectF(x + s * 0.06f, y + s * 0.20f, x + s * 0.94f, y + s * 0.94f),
+                s * 0.18f, s * 0.18f, p);
+        c.drawLine(x + s * 0.06f, y + s * 0.44f, x + s * 0.94f, y + s * 0.44f, p);
+        c.drawLine(x + s * 0.30f, y + s * 0.04f, x + s * 0.30f, y + s * 0.24f, p);
+        c.drawLine(x + s * 0.70f, y + s * 0.04f, x + s * 0.70f, y + s * 0.24f, p);
+    }
+
+    private void iconChart(Canvas c, float x, float y, float s, int color) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setColor(color);
+        float w = s * 0.17f;
+        float[][] bars = {{0.06f, 0.50f}, {0.41f, 0.26f}, {0.76f, 0.04f}};
+        for (float[] b : bars) {
+            RectF r = new RectF(x + s * b[0], y + s * b[1], x + s * b[0] + w, y + s * 0.96f);
+            c.drawRoundRect(r, w / 2, w / 2, p);
+        }
+    }
+
+    private void iconSliders(Canvas c, float x, float y, float s, int color) {
+        Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+        line.setColor(color);
+        line.setStrokeCap(Paint.Cap.ROUND);
+        line.setStrokeWidth(Math.max(1.5f, s * 0.12f));
+        Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dot.setColor(color);
+        float[] ys = {0.22f, 0.50f, 0.78f};
+        float[] kx = {0.36f, 0.68f, 0.44f};
+        for (int i = 0; i < 3; i++) {
+            float ly = y + s * ys[i];
+            c.drawLine(x + s * 0.06f, ly, x + s * 0.94f, ly, line);
+            c.drawCircle(x + s * kx[i], ly, s * 0.13f, dot);
         }
     }
 

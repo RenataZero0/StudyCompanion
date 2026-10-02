@@ -4,6 +4,35 @@
 
 ---
 
+## v2.0.6 —— 启动自动检查更新；仓库改为公开
+
+### 1. 启动时自动检查有没有新版
+
+仓库改成公开之后，检查更新不再需要登录。现在**每次打开程序（每天最多一次）会自动查一次**，
+发现新版就弹窗，可以直接下载并安装：
+
+- 安卓：下载后调系统安装器
+- Windows：下载后自动替换自身并重启
+
+查不到就静默跳过，绝不打扰。手动「检查更新」也去掉了登录限制。
+
+### 2. 私有仓库改成公开
+
+这样两个人人都能直接下载，不用登录：
+
+```
+https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.exe
+https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.apk
+```
+
+下载地址也做了自适应：**没登录时走浏览器直链**（公开仓库不需要令牌），
+登录了才走 API 地址（私有仓库也能用）。
+
+> ⚠️ 同步数据 `sync/progress.txt` 和 `sync/StudyRecord.csv` 现在也是公开可读的。
+> 如果不希望打卡记录公开，告诉我，可以把同步改到独立的私有 Gist 里。
+
+---
+
 ## v2.0.5 —— 去掉 CSV 按钮；同步时自动把 CSV 传到 GitHub
 
 「设置与工具」里的**导出记录 CSV / 导入记录 CSV 两个按钮去掉了**。
