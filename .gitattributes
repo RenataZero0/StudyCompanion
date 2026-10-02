@@ -1,0 +1,19 @@
+# 二进制文件不要让 git 做换行转换
+*.png      binary
+*.ico      binary
+*.xlsx     binary
+*.apk      binary
+*.exe      binary
+*.keystore binary
+*.idsig    binary
+*.zip      binary
+
+# 文本文件按平台归一化
+* text=auto
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cs   text eol=crlf
+*.java text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.xml  text eol=lf

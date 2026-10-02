@@ -1,0 +1,39 @@
+# ======== 绝对不入库：课本 PDF（版权）=======
+Textbook/
+NCUK官方资料/
+pdfs/
+*.pdf
+
+# ======== 构建中间产物 ========
+StudyCompanionAndroid/build/
+StudyCompanionAndroid/_selftest/
+StudyCompanionAndroid/*.apk.idsig
+_plan/__pycache__/
+**/__pycache__/
+
+# ======== 运行时产生的数据（含个人打卡记录）=======
+StudyCompanion/settings.ini
+StudyCompanion/data/progress.tsv
+StudyCompanion/data/progress.tsv.selftestbak
+StudyCompanion/data/daycache.tsv
+StudyCompanion/data/学习记录_*.csv
+StudyCompanionAndroid/assets/daycache.tsv
+**/学习记录_*.csv
+
+# ======== 自检输出 ========
+StudyCompanion/selftest.txt
+StudyCompanion/closetest.txt
+StudyCompanion/layouttest.txt
+StudyCompanion/_*.png
+StudyCompanionAndroid/selftest.txt
+StudyCompanionAndroid/_*.png
+
+# ======== 系统垃圾 ========
+~$*
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# �Լ����
+_plan/checks.json
+
