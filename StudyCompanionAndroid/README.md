@@ -128,15 +128,51 @@ powershell -ExecutionPolicy Bypass -File selftest.ps1
 
 ---
 
+## v2.0.4 / v2.0.3 修掉的三个真机 bug
+
+这三个都是**在模拟器上真跑起来才发现的** —— 之前只做了「编译通过 + 数据层单测」，看不出这些问题。
+
+### 1. 一打开就黑屏闪退（v2.0.4 修）
+
+```
+java.lang.StringIndexOutOfBoundsException: length=7; index=10
+	at com.studycompanion.MainView.calOf(MainView.java:692)
+	at com.studycompanion.MainView.drawCalendar(MainView.java:452)
+	at com.studycompanion.MainView.onDraw(MainView.java:237)
+```
+
+`calOf()` 要的是完整日期 `2026-10-02`，但日历那边传进去的是月份 `2026-10`（只有 7 个字符），
+`substring(8, 10)` 直接越界 → `onDraw` 抛异常 → 窗口还没画出来就崩了。
+
+修复：传 `displayMonthIso + "-01"`，并且让 `calOf()` 自己也能容错（只给月份就补成 1 号，
+彻底解析不了就用今天），不再依赖调用方。
+
+### 2. 日历标题、左右箭头、星期表头挤在同一行（v2.0.4 修）
+
+三者的 Y 坐标算下来都落在 `y+20 ~ y+42`，叠在一起看不清。
+
+修复：标题和箭头一行，星期表头单独一行并加分隔线，日期网格从 `y+72` 开始，
+格子高度按卡片高度 `(h - 80) / 6` 自适应，不再写死 42。
+
+### 3. 平板上卡片里的链接标签跑到卡片外面（v2.0.4 修）
+
+画链接标签时只偏移了纵向 `pr.offset(0, base)`，横向没偏移。
+单栏布局时 `pad ≈ 0` 看不出来，**平板切成两栏后卡片左边距变成 50+，标签就贴到屏幕左边缘了**。
+
+修复：`pr.offset(pad, base)`。
+
+---
+
 ## 已知限制 / 未验证项
 
-- **界面没有在真机或模拟器上跑过。** 本机 `accel-check` 报「Android Emulator hypervisor driver is not installed」，
-  且 `HypervisorPresent = False`；开启需要管理员权限。手动启动模拟器直接以 `0xC0000005`（访问违例）崩溃。
-  所以：
-  - **已严格验证**：数据层（课表解析、链接映射）在电脑 JVM 上跑通，输出与桌面版逐项一致
-  - **已验证**：APK 结构、清单、权限、图标、签名（v1 + v2）
-  - **未验证**：真机上的绘制效果、触摸手感，以及**平板两栏布局的实际观感**
-  - 装上后如果哪里不对，截图发我，我来调
+- **已在模拟器上实机验证**（v2.0.4）。装好 Android Emulator Hypervisor Driver 后，
+  分别用 **Pixel 5（1080×2340 @440dpi）** 和 **10.1" 平板（1280×800 @160dpi）** 两个 AVD 跑通：
+  - 手机竖屏：单栏，任务卡 / 日历 / 统计 / 工具全部正常渲染
+  - 平板横屏：自动切成左右两栏，卡片、日历、链接标签位置都正确
+  - 启动无崩溃，滚动、点击正常
+  - 截图见 `preview/phone.png` 与 `preview/tablet.png`
+- **仍未验证**：Android 端的 GitHub 登录 / 同步 / 自动更新没有在真机上点过
+  （桌面端同一套 API 已实测通过，但安卓用的是 `HttpURLConnection` + `org.json`，是另一条代码路径）
 - **课本 PDF 打不开**（文件在电脑上，且体积超过 GitHub 允许的范围）
 - 课表是**打包进 APK** 的。如果之后改了 `Schedule.xlsx`，需要重新编译 APK
 

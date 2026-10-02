@@ -430,7 +430,9 @@ public class MainView extends View {
             float base = y + h - Ui.px(14) - pillY;
             for (int i = 0; i < links.size(); i++) {
                 RectF pr = pillRects.get(i);
-                pr.offset(0, base);
+                // X 也要偏移到卡片左边 —— 只偏移 Y 的话，
+                // 单栏时 pad≈0 看不出问题，平板两栏时标签会跑到卡片外面
+                pr.offset(pad, base);
                 boolean menu = menuOwner == idx && i == links.size() - 1;
                 Ui.roundRect(c, pr, pr.height() / 2, menu ? Ui.ACCENT_SOFT : 0xFFFFFFFF);
                 Ui.roundStroke(c, pr, pr.height() / 2, menu ? Ui.ACCENT : Ui.LINE, 1f);
@@ -449,14 +451,15 @@ public class MainView extends View {
         Ui.roundRect(c, pad, y, pad + w, y + h, Ui.px(14), Ui.CARD);
         Ui.roundStroke(c, new RectF(pad, y, pad + w, y + h), Ui.px(14), Ui.LINE, 1f);
 
-        Calendar shown = calOf(displayMonthIso);
+        // 注意：displayMonthIso 是 "2026-10"（7 个字符），calOf 要的是完整日期，必须补上日
+        Calendar shown = calOf(displayMonthIso + "-01");
         Ui.text(c, shown.get(Calendar.YEAR) + " 年 " + (shown.get(Calendar.MONTH) + 1) + " 月",
-                pad + Ui.px(16), y + Ui.px(26), Ui.font(14, true, Ui.INK));
+                pad + Ui.px(16), y + Ui.px(32), Ui.font(14, true, Ui.INK));
 
-        // 左右箭头
+        // 左右箭头（和标题同一行，右对齐）
         float ax = pad + w - Ui.px(16) - Ui.px(58);
-        RectF prev = new RectF(ax, y + Ui.px(10), ax + Ui.px(26), y + Ui.px(34));
-        RectF next = new RectF(ax + Ui.px(32), y + Ui.px(10), ax + Ui.px(58), y + Ui.px(34));
+        RectF prev = new RectF(ax, y + Ui.px(14), ax + Ui.px(26), y + Ui.px(38));
+        RectF next = new RectF(ax + Ui.px(32), y + Ui.px(14), ax + Ui.px(58), y + Ui.px(38));
         Ui.roundRect(c, prev, Ui.px(8), 0x0F000000);
         Ui.roundRect(c, next, Ui.px(8), 0x0F000000);
         Ui.textC(c, "‹", prev, Ui.font(16, true, Ui.SUB));
@@ -464,14 +467,18 @@ public class MainView extends View {
         hit(prev, A_DAY, shiftMonth(displayMonthIso, -1) + "#month", 0);
         hit(next, A_DAY, shiftMonth(displayMonthIso, 1) + "#month", 0);
 
+        // 星期表头和日期网格都要排在标题下面，否则会互相压在一起
         String[] wd = {"一", "二", "三", "四", "五", "六", "日"};
         float gx = pad + Ui.px(12);
         float gw = w - Ui.px(24);
         float cw = gw / 7f;
-        float gy = y + Ui.px(44);
-        float ch = Ui.px(42);
+        float headTop = y + Ui.px(44);
+        float gy = y + Ui.px(72);                       // 日期网格起点
+        float ch = (h - Ui.px(80)) / 6f;                // 6 行自适应，别写死
+
+        Ui.roundRect(c, gx, headTop + Ui.px(22), gx + gw, headTop + Ui.px(23), 0, Ui.LINE);
         for (int i = 0; i < 7; i++) {
-            Ui.textC(c, wd[i], new RectF(gx + i * cw, gy - Ui.px(24), gx + (i + 1) * cw, gy - Ui.px(2)),
+            Ui.textC(c, wd[i], new RectF(gx + i * cw, headTop, gx + (i + 1) * cw, headTop + Ui.px(22)),
                     Ui.font(13, false, i >= 5 ? Ui.AMBER : Ui.SUB));
         }
 
@@ -686,10 +693,22 @@ public class MainView extends View {
     }
 
     // ---------------------------------------------------------------- 小工具
+    /**
+     * "yyyy-MM-dd" 或 "yyyy-MM" → Calendar。
+     * 只给月的时候补成 1 号，避免 substring 越界（之前真机闪退就是这个）。
+     */
     static Calendar calOf(String iso) {
+        String s = iso == null ? "" : iso.trim();
+        if (s.length() == 7) s = s + "-01";
+        while (s.length() < 10) s = s + "-01";
         Calendar c = Calendar.getInstance();
-        c.set(Integer.parseInt(iso.substring(0, 4)), Integer.parseInt(iso.substring(5, 7)) - 1,
-                Integer.parseInt(iso.substring(8, 10)));
+        try {
+            c.set(Integer.parseInt(s.substring(0, 4)), Integer.parseInt(s.substring(5, 7)) - 1,
+                    Integer.parseInt(s.substring(8, 10)));
+        } catch (Exception e) {
+            // 实在解析不了就用今天，总比崩了强
+            c = Calendar.getInstance();
+        }
         c.set(Calendar.HOUR_OF_DAY, 0);
         c.set(Calendar.MINUTE, 0);
         c.set(Calendar.SECOND, 0);

@@ -49,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.0.3";
+        public const string VersionTag = "v2.0.4";
 
         public const string SyncPath = "sync/progress.txt";
 

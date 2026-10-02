@@ -18,43 +18,12 @@ namespace StudyCompanion
         public int Streak, Best;
         public double Hours;
 
-        // GitHub 入口（点开独立窗口）
-        public bool GhLoggedIn;
-        public string GhUser = "";
-        public event EventHandler GhClick;
-        Rectangle _ghRect = Rectangle.Empty;
-        bool _ghHover;
-
         public HeaderBar()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
                      ControlStyles.SupportsTransparentBackColor, true);
             BackColor = Color.Transparent;
-        }
-
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            bool hot = _ghRect.Contains(e.Location);
-            if (hot != _ghHover)
-            {
-                _ghHover = hot;
-                Cursor = hot ? Cursors.Hand : Cursors.Default;
-                Invalidate(_ghRect);
-            }
-            base.OnMouseMove(e);
-        }
-
-        protected override void OnMouseLeave(EventArgs e)
-        {
-            if (_ghHover) { _ghHover = false; Cursor = Cursors.Default; Invalidate(_ghRect); }
-            base.OnMouseLeave(e);
-        }
-
-        protected override void OnMouseClick(MouseEventArgs e)
-        {
-            if (_ghRect.Contains(e.Location) && GhClick != null) GhClick(this, EventArgs.Empty);
-            base.OnMouseClick(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -89,18 +58,6 @@ namespace StudyCompanion
             var fsub = Ui.F(9.5f);
             Ui.Text(g, sub, fsub, Ui.Sub, x, y + Ui.Px(30));
 
-            // ---- GitHub 入口：独立窗口，不再占用右侧栏 ----
-            int subW = (int)g.MeasureString(sub, fsub).Width;
-            string gtxt = GhLoggedIn ? ("GitHub " + (GhUser.Length > 0 ? GhUser : "已登录")) : "GitHub 同步";
-            var gf = Ui.F(8.5f, true);
-            int gw = Math.Max(Ui.Px(96), (int)g.MeasureString(gtxt, gf).Width + Ui.Px(26));
-            _ghRect = new Rectangle(x + subW + Ui.Px(16), y + Ui.Px(29), gw, Ui.Px(24));
-            Color gfg = GhLoggedIn ? Ui.Green : Ui.Accent;
-            Color gbg = GhLoggedIn ? Ui.GreenSoft : Ui.AccentSoft;
-            if (_ghHover) gbg = GhLoggedIn ? ColorTranslator.FromHtml("#D3EFE0") : ColorTranslator.FromHtml("#D9E4FD");
-            Ui.FillRound(g, _ghRect, _ghRect.Height / 2, gbg);
-            Ui.StrokeRound(g, _ghRect, _ghRect.Height / 2, gfg, 1f);
-            Ui.TextC(g, gtxt, gf, gfg, _ghRect);
 
             // ---------- 右侧进度区：文字 / 进度条 / 统计 分三行，互不重叠 ----------
             int rightW = Ui.Px(320);
@@ -456,13 +413,103 @@ namespace StudyCompanion
         }
     }
 
+    // ===================================================================== 底部状态栏
+    /// <summary>
+    /// 底部状态栏：左边是提醒/数据源文字，右边是 GitHub 入口。
+    /// 放这里不挤顶栏，也不占右侧内容区的高度。
+    /// </summary>
+    public class StatusBar : Control
+    {
+        public bool GhLoggedIn;
+        public string GhUser = "";
+        public event EventHandler GhClick;
+
+        string _text = "";
+        Rectangle _ghRect = Rectangle.Empty;
+        bool _hover;
+
+        public StatusBar()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
+                     ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            BackColor = Color.White;
+        }
+
+        public string StatusText
+        {
+            get { return _text; }
+            set { _text = value ?? ""; Invalidate(); }
+        }
+
+        string ButtonText()
+        {
+            return GhLoggedIn ? ("GitHub · " + (GhUser.Length > 0 ? GhUser : "已登录")) : "GitHub 同步";
+        }
+
+        void LayoutButton(Graphics g)
+        {
+            var f = Ui.F(8.5f, true);
+            int w = Math.Max(Ui.Px(104), (int)g.MeasureString(ButtonText(), f).Width + Ui.Px(28));
+            _ghRect = new Rectangle(Width - Ui.Px(18) - w, (Height - Ui.Px(22)) / 2, w, Ui.Px(22));
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+            using (var p = new Pen(Ui.Line, 1)) g.DrawLine(p, 0, 0, Width, 0);
+
+            var ft = Ui.F(9f);
+            if (_text.Length > 0)
+                Ui.Text(g, _text, ft, Ui.Sub, Ui.Px(24), (Height - ft.Height) / 2);
+
+            LayoutButton(g);
+            string t = ButtonText();
+            var f = Ui.F(8.5f, true);
+            Color fg = GhLoggedIn ? Ui.Green : Ui.Accent;
+            Color bg = GhLoggedIn ? Ui.GreenSoft : Ui.AccentSoft;
+            if (_hover) bg = GhLoggedIn
+                ? ColorTranslator.FromHtml("#D3EFE0")
+                : ColorTranslator.FromHtml("#D9E4FD");
+            Ui.FillRound(g, _ghRect, _ghRect.Height / 2, bg);
+            Ui.StrokeRound(g, _ghRect, _ghRect.Height / 2, fg, 1f);
+            Ui.TextC(g, t, f, fg, _ghRect);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            bool hot = _ghRect.Contains(e.Location);
+            if (hot != _hover)
+            {
+                _hover = hot;
+                Cursor = hot ? Cursors.Hand : Cursors.Default;
+                Invalidate();
+            }
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            if (_hover) { _hover = false; Cursor = Cursors.Default; Invalidate(); }
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            if (_ghRect.Contains(e.Location) && GhClick != null) GhClick(this, EventArgs.Empty);
+            base.OnMouseClick(e);
+        }
+    }
+
     // ===================================================================== 主窗体
     public class MainForm : Form
     {
         readonly Panel _leftScroll = new Panel();
         readonly Panel _rightFlow = new Panel();
         readonly HeaderBar _header = new HeaderBar();
-        readonly Label _status = new Label();
+        readonly StatusBar _status = new StatusBar();
         readonly MiniCalendar _cal = new MiniCalendar();
         readonly SimpleCard _stats = new SimpleCard("学习统计");
         readonly SimpleCard _tools = new SimpleCard("设置与工具");
@@ -498,12 +545,7 @@ namespace StudyCompanion
 
             // ---- 状态栏
             _status.Dock = DockStyle.Bottom;
-            _status.Height = Ui.Px(30);
-            _status.TextAlign = ContentAlignment.MiddleLeft;
-            _status.Padding = new Padding(Ui.Px(24), 0, 0, 0);
-            _status.ForeColor = Ui.Sub;
-            _status.BackColor = Color.White;
-            _status.Font = Ui.F(9f);
+            _status.Height = Ui.Px(32);
             Controls.Add(_status);
 
             // ---- 主体
@@ -578,7 +620,7 @@ namespace StudyCompanion
 
             _inst = this;
             FillGitHubUser();
-            _header.GhClick += delegate { OpenGitHub(); };
+            _status.GhClick += delegate { OpenGitHub(); };
             _rightFlow.Resize += delegate { LayoutRight(); };
             _leftScroll.Resize += delegate { LayoutLeft(); };
             Resize += delegate { LayoutRight(); LayoutLeft(); };
@@ -675,8 +717,9 @@ namespace StudyCompanion
                 _header.Streak = Store.Streak();
                 _header.Best = Store.BestStreak();
                 _header.Hours = Store.TotalHours();
-                _header.GhLoggedIn = GitHub.LoggedIn;
-                _header.GhUser = GitHub.User;
+                _status.GhLoggedIn = GitHub.LoggedIn;
+                _status.GhUser = GitHub.User;
+                _status.Invalidate();
                 _header.Invalidate();
 
                 if (rebuildCards) BuildCards(dp);
@@ -728,7 +771,7 @@ namespace StudyCompanion
             }
             string src = "数据源：" + (ScheduleData.LoadedFromCache ? "缓存（课表被占用）" : Path.GetFileName(ScheduleData.WorkbookPath));
             if (!string.IsNullOrEmpty(ScheduleData.LastError)) src = "⚠ " + ScheduleData.LastError;
-            _status.Text = "　" + next + "         " + src + "　|　课表共 " + ScheduleData.DayCount + " 天";
+            _status.StatusText = "　" + next + "         " + src + "　|　课表共 " + ScheduleData.DayCount + " 天";
         }
 
         /// <summary>布局稳定性探针（供 --layouttest 自检用）</summary>
@@ -740,7 +783,7 @@ namespace StudyCompanion
             sb.Append("stats=").Append(_stats.Bounds).Append(" | ");
             sb.Append("tools=").Append(_tools.Bounds).Append(" | ");
             sb.Append("rightH=").Append(_rightFlow.ClientSize.Height).Append(" | ");
-            sb.Append("githubBtn=").Append(_header.GhLoggedIn).Append(" | ");
+            sb.Append("ghLogged=").Append(_status.GhLoggedIn).Append(" | ");
             sb.Append("leftW=").Append(_leftScroll.Width).Append('/').Append(_leftScroll.ClientSize.Width).Append(" | ");
             int n = 0;
             foreach (Control c in _leftScroll.Controls)
