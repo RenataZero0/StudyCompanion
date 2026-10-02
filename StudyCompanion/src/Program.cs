@@ -107,8 +107,11 @@ namespace StudyCompanion
 
             if (Path.GetFileName(path).ToLower().Contains("doc"))
             {
-                string cp = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CHANGELOG.md");
-                string md = File.Exists(cp) ? File.ReadAllText(cp, Encoding.UTF8) : "（没有找到 CHANGELOG.md）";
+                // 先同步拉一次，这样截图内容是确定的，也顺便验证了自动更新这条链路
+                string err;
+                bool ok = Changelog.Fetch(out err);
+                string md = Changelog.Local();
+                if (string.IsNullOrEmpty(md)) md = "（没有找到更新日志）";
                 var v = new DocViewer("更新日志 · StudyCompanion", md);
                 v.ShowInTaskbar = false;
                 v.StartPosition = FormStartPosition.Manual;
@@ -118,7 +121,11 @@ namespace StudyCompanion
                 int blen = v.BodyLength;
                 using (var b = v.Snapshot()) b.Save(path, System.Drawing.Imaging.ImageFormat.Png);
                 v.Close();
-                Console.WriteLine("doc snapshot -> " + path + "  | 正文字符数=" + blen);
+                Console.WriteLine("doc snapshot -> " + path
+                    + "  | 拉取=" + (ok ? "成功" : "失败(" + err + ")")
+                    + "  | 缓存=" + Changelog.HasCache
+                    + "  | 最新版本=" + Changelog.LatestVersionIn(md)
+                    + "  | 正文字符数=" + blen);
                 
                 return;
             }

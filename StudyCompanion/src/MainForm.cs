@@ -658,19 +658,10 @@ namespace StudyCompanion
             }
         }
 
-        /// <summary>用内置阅读器打开 CHANGELOG.md</summary>
+        /// <summary>用内置阅读器打开更新日志（打开时会自动从 GitHub 拉最新的一份）</summary>
         void ShowChangelog()
         {
-            string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CHANGELOG.md");
-            string md;
-            try
-            {
-                md = File.Exists(p)
-                    ? File.ReadAllText(p, System.Text.Encoding.UTF8)
-                    : "没有找到 CHANGELOG.md。\n\n它应该和 StudyCompanion.exe 放在同一个文件夹里。";
-            }
-            catch (Exception ex) { md = "读取更新日志失败：" + ex.Message; }
-            var v = new DocViewer("更新日志 · StudyCompanion", md);
+            var v = new DocViewer("更新日志 · StudyCompanion");
             v.Show(this);
         }
 
@@ -948,6 +939,8 @@ namespace StudyCompanion
                 {
                     var rel = GitHub.LatestRelease();
                     try { File.WriteAllText(stamp, today); } catch { }
+                    // 顺手把更新日志也刷一下，这样打开阅读器就是最新的
+                    try { string e2; Changelog.Fetch(out e2); } catch { }
                     if (string.IsNullOrEmpty(rel.Tag)) return;
                     if (string.Equals(rel.Tag, GitHub.VersionTag, StringComparison.OrdinalIgnoreCase)) return;
                     if (string.IsNullOrEmpty(rel.ExeDownload(GitHub.LoggedIn))) return;

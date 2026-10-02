@@ -19,8 +19,8 @@ foreach ($p in @("$BT\aapt2.exe", "$BT\d8.bat", "$BT\zipalign.exe", "$BT\apksign
 }
 $env:JAVA_HOME = $JDK
 
-# 版本号从 GitHub.java 里的 VERSION_TAG 推导，保证安装器显示的版本与发布版本一致。
-# 之前 manifest 里写死 versionCode=1 / versionName=1.0，导致每次安装都显示 1.0。
+# Version comes from VERSION_TAG in GitHub.java so it can never drift from the release.
+# (The manifest used to hardcode versionCode=1 / versionName=1.0.)
 $ghjava = Get-Content "$here\src\com\studycompanion\GitHub.java" -Raw
 if ($ghjava -match 'VERSION_TAG\s*=\s*"v?(\d+)\.(\d+)(?:\.(\d+))?"') {
     $maj = [int]$Matches[1]
@@ -32,6 +32,14 @@ if ($ghjava -match 'VERSION_TAG\s*=\s*"v?(\d+)\.(\d+)(?:\.(\d+))?"') {
     throw "cannot parse VERSION_TAG from GitHub.java"
 }
 Write-Host ("version: {0}  (versionCode {1})" -f $verName, $verCode)
+
+# CHANGELOG.md lives at the repo root. Copy it into assets as the offline fallback;
+# at runtime the app prefers the copy it fetched from GitHub.
+$cl = Join-Path (Split-Path -Parent $here) "CHANGELOG.md"
+if (Test-Path $cl) {
+    Copy-Item $cl (Join-Path $here "assets\CHANGELOG.md") -Force
+    Write-Host "changelog: copied from repo root"
+}
 
 $out = "$here\build"
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }

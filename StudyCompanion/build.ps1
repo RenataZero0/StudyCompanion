@@ -1,4 +1,4 @@
-﻿# Build StudyCompanion.exe
+# Build StudyCompanion.exe
 # Usage: powershell -ExecutionPolicy Bypass -File build.ps1
 #
 # NOTE: keep this file ASCII-only. PowerShell 5.1 decodes .ps1 files as ANSI
@@ -27,5 +27,11 @@ if (Test-Path $ico) {
     /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll `
     /r:System.Xml.Linq.dll /r:System.Core.dll /r:System.Web.Extensions.dll /r:System.Security.dll @iconArgs $src
 
-if ($LASTEXITCODE -eq 0) { Write-Host "OK -> $out" -ForegroundColor Green }
+if ($LASTEXITCODE -eq 0) {
+    # CHANGELOG.md lives at the repo root; copy it next to the exe as an offline fallback.
+    # At runtime the app prefers the copy it fetched from GitHub.
+    $cl = Join-Path (Split-Path -Parent $here) "CHANGELOG.md"
+    if (Test-Path $cl) { Copy-Item $cl (Join-Path $here "CHANGELOG.md") -Force }
+    Write-Host "OK -> $out" -ForegroundColor Green
+}
 else { Write-Host "BUILD FAILED (exit $LASTEXITCODE)" -ForegroundColor Red }

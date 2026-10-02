@@ -58,3 +58,8 @@ StudyCompanionAndroid/preview/phone-*.png
 # 安装程序的编译中间产物
 StudyCompanionSetup/build/
 
+
+# 更新日志的生成副本（唯一来源是仓库根目录的 CHANGELOG.md）
+StudyCompanion/CHANGELOG.md
+StudyCompanionAndroid/assets/CHANGELOG.md
+
