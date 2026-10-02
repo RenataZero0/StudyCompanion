@@ -550,7 +550,23 @@ public class MainView extends View {
             pillY = py + rowH;
         }
 
-        float h = Ui.px(14) + Ui.px(26) + Ui.px(26);
+        // 标题换行（最多 3 行）。以前是 ellipsize 成一行，稍长的标题就被截掉了。
+        // 标题在完成按钮下面，所以第一行也可以占满整个宽度，不用避开按钮。
+        Paint pTitle = Ui.font(14, true, done ? Ui.DONE_TEXT : Ui.INK);
+        List<String> titleLines = new ArrayList<String>();
+        if (!s.body.isEmpty() && s.body.get(0).length() > 0) {
+            float titleW = w - Ui.px(32);
+            titleLines = Ui.wrap(pTitle, s.body.get(0), titleW);
+            if (titleLines.size() > 3) {
+                List<String> cut = new ArrayList<String>(titleLines.subList(0, 3));
+                cut.set(2, Ui.ellipsize(pTitle, cut.get(2) + "…", titleW));
+                titleLines = cut;
+            }
+        }
+        float titleH = titleLines.isEmpty() ? 0 : titleLines.size() * Ui.px(22);
+
+        float h = Ui.px(14) + Ui.px(26);
+        if (titleH > 0) h += Ui.px(12) + titleH;
         if (book.length() > 0) h += Ui.px(23);
         h += Math.max(0, s.body.size() - 1) * Ui.px(20);
         if (!links.isEmpty()) h += pillY + Ui.px(10);
@@ -592,13 +608,11 @@ public class MainView extends View {
 
         float cy = y + Ui.px(52);
 
-        // 标题
-        if (!s.body.isEmpty()) {
-            Paint pH = Ui.font(14, true, done ? Ui.DONE_TEXT : Ui.INK);
-            Ui.text(c, Ui.ellipsize(pH, s.body.get(0), w - Ui.px(32) - dw - Ui.px(16)),
-                    x, cy, pH);
-            cy += Ui.px(24);
+        // 标题（可能多行）
+        for (int li = 0; li < titleLines.size(); li++) {
+            Ui.text(c, titleLines.get(li), x, cy + li * Ui.px(22), pTitle);
         }
+        if (titleH > 0) cy += titleH + Ui.px(2);
 
         // 课本行
         if (book.length() > 0) {

@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Text;
 using System.Windows.Forms;
 
 namespace StudyCompanion
@@ -10,20 +12,33 @@ namespace StudyCompanion
     ///
     /// 打开时会自动从 GitHub 拉一次最新的 CHANGELOG.md：
     /// 拉到了就用最新的（同时写入缓存），拉不到就显示缓存/内置副本，并说明原因。
-    /// 所以即使程序本身是旧版本，也能看到新版本改了什么。
+    ///
+    /// 日志很长，所以**按版本分页**：标题下面一排版本标签，点哪个看哪个；
+    /// 第一个「全部」显示完整日志。
     /// </summary>
     public class DocViewer : Form
     {
+        /// <summary>一个版本一节</summary>
+        class Sec
+        {
+            public string Label;   // "全部" 或 "v2.1.2"
+            public string Md;      // 这一节要渲染的 markdown
+        }
+
         readonly MarkdownView _view = new MarkdownView();
         readonly Label _status = new Label();
         readonly Pill _refresh = new Pill();
+        readonly Panel _chips = new Panel();
+        readonly List<Pill> _chipCtl = new List<Pill>();
+
+        readonly List<Sec> _sections = new List<Sec>();
+        int _sel;
 
         /// <summary>自检用：正文长度</summary>
         public int BodyLength { get { return _md == null ? 0 : _md.Length; } }
         string _md = "";
         bool _busy;
         bool _fetchedOnce;
-
         readonly bool _autoFetch = true;
 
         public DocViewer(string title) : this(title, null) { }
@@ -37,13 +52,14 @@ namespace StudyCompanion
             Text = title;
             BackColor = Ui.Bg;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(Ui.Px(780), Ui.Px(680));
-            MinimumSize = new Size(Ui.Px(560), Ui.Px(440));
+            ClientSize = new Size(Ui.Px(800), Ui.Px(720));
+            MinimumSize = new Size(Ui.Px(580), Ui.Px(480));
             Font = Ui.F(9f);
             AutoScaleMode = AutoScaleMode.None;
             ShowInTaskbar = false;
             try { Icon = AppIcon.Get(32); } catch { }
 
+            // ---------------- 顶栏 ----------------
             var head = new Panel();
             head.Dock = DockStyle.Top;
             head.Height = Ui.Px(62);
@@ -87,12 +103,29 @@ namespace StudyCompanion
             head.Controls.Add(_refresh);
             _refresh.BringToFront();
 
+            // ---------------- 版本标签行 ----------------
+            _chips.Dock = DockStyle.Top;
+            _chips.Height = Ui.Px(54);   // 含横向滚动条
+            _chips.BackColor = Color.White;
+            _chips.AutoScroll = true;
+            _chips.Paint += delegate (object s, PaintEventArgs e)
+            {
+                using (var p = new Pen(Ui.Line, 1))
+                    e.Graphics.DrawLine(p, 0, _chips.Height - 1, _chips.Width, _chips.Height - 1);
+            };
+            Controls.Add(_chips);
+
+            // ---------------- 内容 ----------------
             var host = new Panel();
             host.Dock = DockStyle.Fill;
             host.Padding = new Padding(Ui.Px(16), Ui.Px(12), Ui.Px(16), Ui.Px(16));
             host.BackColor = Ui.Bg;
             Controls.Add(host);
+            // WinForms 的 Dock 顺序按 z-order 反着来：index 越大越先 Dock（越靠外）。
+            // host 拉到最前（index 0，填满剩余），head 丢到最后（index 最大，贴最上面），
+            // 标签行自然就夹在中间。
             host.BringToFront();
+            head.SendToBack();
 
             var card = new Card();
             card.Dock = DockStyle.Fill;
@@ -102,17 +135,109 @@ namespace StudyCompanion
             _view.Dock = DockStyle.Fill;
             card.Controls.Add(_view);
 
-            SetContent(markdown ?? Changelog.Local());
+            BuildSections(markdown ?? Changelog.Local());
+            _sel = 0;
+            if (_sections.Count > 1) _sel = 1;
+            RebuildChips();
+            RenderCurrent();
+
             Shown += delegate { if (_autoFetch && !_fetchedOnce) FetchAsync(); };
+        }
+
+        // ================================================================ 分页
+        /// <summary>
+        /// 按 "## 标题" 把日志切成若干节。第一项固定是「全部」，其余每个版本一项。
+        /// </summary>
+        void BuildSections(string src)
+        {
+            _sections.Clear();
+            _sections.Add(new Sec { Label = "全部", Md = src });
+            _sel = 0;
+            if (string.IsNullOrEmpty(src)) return;
+
+            var cur = new StringBuilder();
+            string curTitle = null;
+            bool started = false;
+
+            foreach (var raw in src.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+            {
+                string t = raw.Trim();
+                if (t.StartsWith("## ") && !t.StartsWith("### "))
+                {
+                    if (started) AddSection(curTitle, cur.ToString());
+                    cur.Length = 0;
+                    curTitle = t.Substring(3).Trim();
+                    cur.AppendLine(raw);
+                    started = true;
+                }
+                else if (started)
+                {
+                    cur.AppendLine(raw);
+                }
+            }
+            if (started) AddSection(curTitle, cur.ToString());
+
+            // 默认选中最新那一版（第 0 项是「全部」）
+            _sel = _sections.Count > 1 ? 1 : 0;
+        }
+
+        void AddSection(string title, string body)
+        {
+            if (string.IsNullOrEmpty(title)) return;
+            // 标题形如 "v2.1.2 —— 列表续行…"，标签上只取版本号
+            int sp = title.IndexOf(' ');
+            string label = sp > 0 ? title.Substring(0, sp) : title;
+            _sections.Add(new Sec { Label = label, Md = body });
+        }
+
+        void RebuildChips()
+        {
+            foreach (var c in _chipCtl) { _chips.Controls.Remove(c); c.Dispose(); }
+            _chipCtl.Clear();
+
+            int x = Ui.Px(18), y = Ui.Px(8), h = Ui.Px(28);
+            for (int i = 0; i < _sections.Count; i++)
+            {
+                var p = new Pill();
+                p.Text = _sections[i].Label;
+                p.Font = Ui.F(9f, true);
+                int w = Math.Max(Ui.Px(58), Pill.Measure(p.Text, p.Font));
+                p.SetBounds(x, y, w, h);
+                p.Primary = (i == _sel);
+                int idx = i;
+                p.Click += delegate { SelectSection(idx); };
+                _chips.Controls.Add(p);
+                _chipCtl.Add(p);
+                x += w + Ui.Px(8);
+            }
+        }
+
+        void SelectSection(int i)
+        {
+            if (i < 0 || i >= _sections.Count || i == _sel) return;
+            _sel = i;
+            RenderCurrent();
+            for (int k = 0; k < _chipCtl.Count; k++)
+            {
+                _chipCtl[k].Primary = (k == _sel);
+                _chipCtl[k].Invalidate();
+            }
+            try { if (i < _chipCtl.Count) _chips.ScrollControlIntoView(_chipCtl[i]); }
+            catch { }
+        }
+
+        void RenderCurrent()
+        {
+            if (_sections.Count == 0) return;
+            SetContent(_sections[_sel].Md);
+            UpdateStatus(true);
         }
 
         // ================================================================ 内容
         void SetContent(string md)
         {
-            if (string.IsNullOrEmpty(md)) md = "（还没有更新日志内容）";
-            _md = md;
-            _view.SetMarkdown(md);
-            UpdateStatus(true);
+            _md = string.IsNullOrEmpty(md) ? "（还没有更新日志内容）" : md;
+            _view.SetMarkdown(_md);
         }
 
         void UpdateStatus(bool showSource)
@@ -161,7 +286,17 @@ namespace StudyCompanion
 
             if (ok)
             {
-                SetContent(Changelog.Local());
+                string keep = _sections.Count > 0 ? _sections[_sel].Label : "";
+                BuildSections(Changelog.Local());
+                // 尽量停在原来那一版
+                for (int i = 1; i < _sections.Count; i++)
+                {
+                    if (_sections[i].Label == keep) { _sel = i; break; }
+                }
+                if (_sel == 0 && _sections.Count > 1) _sel = 1;
+                RebuildChips();
+                RenderCurrent();
+
                 DateTime? t = Changelog.CacheTime;
                 _status.Text += t.HasValue ? "　·　" + t.Value.ToString("HH:mm") + " 更新" : "";
             }

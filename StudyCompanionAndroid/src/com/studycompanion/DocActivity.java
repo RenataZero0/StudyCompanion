@@ -17,10 +17,11 @@ import java.util.List;
 /**
  * 更新日志阅读器（自绘 Markdown）。
  *
- * 打开时会自动从 GitHub 拉一次最新的 CHANGELOG.md：拉到了就用最新的（同时写缓存），
- * 拉不到就显示缓存 / APK 内置副本，并在标题下说明原因。右上角「刷新」可手动再拉。
+ * 打开时自动从 GitHub 拉最新的一份；拉到了用最新的（写缓存），
+ * 拉不到就用缓存 / APK 内置副本，并在标题下说明原因。
  *
- * 支持：# / ## / ### 标题、- 项目符号、> 引用、**粗体**、`代码`、``` 代码块，以及表格。
+ * 日志很长，所以**按版本分页**：顶栏下面一排版本标签，点哪个看哪个；
+ * 第一个「全部」标签显示完整日志。
  */
 public class DocActivity extends Activity {
 
@@ -37,7 +38,7 @@ public class DocActivity extends Activity {
 
         // ---- 间距体系：标题靠「上方留白」拉开层次，正文之间只留小空 ----
         static final int GAP_H1_TOP = 8,  GAP_H1_BOT = 12;
-        static final int GAP_H2_TOP = 30, GAP_H2_BOT = 10;
+        static final int GAP_H2_TOP = 24, GAP_H2_BOT = 10;
         static final int GAP_H3_TOP = 18, GAP_H3_BOT = 8;
         static final int GAP_PARA   = 9;
         static final int GAP_BLANK  = 9;
@@ -49,26 +50,34 @@ public class DocActivity extends Activity {
 
         static final int TONE_OK = 0, TONE_NEW = 1, TONE_LOCAL = 2, TONE_ERR = 3;
 
-        /** 项目符号占的横向空间（画的时候也是这个值） */
         static final int BULLET_INDENT = 14;
-        /** 有序列表序号占的横向空间 */
         static final int ORDER_INDENT = 24;
         static final java.util.regex.Pattern ORDERED =
                 java.util.regex.Pattern.compile("^(\\d{1,3})\\.\\s+(.*)$", java.util.regex.Pattern.DOTALL);
 
+        /** 一个版本一节 */
+        static class Sec {
+            String label;      // "全部" 或 "v2.1.2"
+            String md;         // 这一节要渲染的 markdown
+        }
+
         private final List<Blk> blocks = new ArrayList<Blk>();
+        private final List<Sec> sections = new ArrayList<Sec>();
+        private int sel = 0;
+
         private float scroll = 0, contentH = 0;
         private final OverScroller scroller;
-        private float downY, downScroll;
-        private boolean dragging;
+        private float downY, downScroll, downX;
+        private boolean dragging, dragChips;
         private final int slop;
 
-        private int cardX;      // 内容卡片的左右外边距
-        private int textPad;    // 卡片内部文字的左右内边距
-        private float headerH;
+        private int cardX, textPad;
+        private float headerH, chipTop, chipH;
 
-        String md = "";
-        String status = "";
+        private final List<RectF> chipRects = new ArrayList<RectF>();
+        private float chipScroll = 0, chipContentW = 0;
+
+        String md = "", status = "";
         int statusTone = TONE_OK;
         boolean busy;
         RectF closeRect = new RectF();
@@ -80,7 +89,7 @@ public class DocActivity extends Activity {
             Paint paint;
             int gapTop, gapBot, indent;
             boolean bullet, code, divider, spacer, ruleBar, para;
-            String marker;          // 有序列表的序号文字（无序列表留 null，画圆点）
+            String marker;
 
             float y, h;
 
@@ -98,18 +107,76 @@ public class DocActivity extends Activity {
             super(ctx);
             scroller = new OverScroller(ctx);
             slop = (int) (8 * getResources().getDisplayMetrics().density);
-            headerH = Ui.px(80);
             cardX = Ui.px(12);
             textPad = Ui.px(18);
+            chipTop = Ui.px(74);
+            chipH = Ui.px(38);
+            headerH = chipTop + chipH + Ui.px(8);
         }
 
         // ---------------------------------------------------------- 拉取
         void load() {
             md = Changelog.local(getContext());
-            parse(md);
+            buildSections(md);
+            parse(sections.get(sel).md);
             updateStatusText();
             if (getWidth() > 0) measure();
             fetchAsync();
+        }
+
+        /**
+         * 按 "## 标题" 把日志切成若干节。第一项固定是「全部」，其余每个版本一项。
+         * 这样日志再长也能一页一页看。
+         */
+        void buildSections(String src) {
+            sections.clear();
+            Sec all = new Sec();
+            all.label = "全部";
+            all.md = src;
+            sections.add(all);
+            sel = 0;
+            if (src == null) return;
+
+            String[] lines = src.replace("\r\n", "\n").replace('\r', '\n').split("\n");
+            StringBuilder cur = null;
+            String curTitle = null;
+            for (String ln : lines) {
+                String t = ln.trim();
+                if (t.startsWith("## ") && !t.startsWith("### ")) {
+                    if (cur != null) addSection(curTitle, cur.toString());
+                    cur = new StringBuilder();
+                    curTitle = t.substring(3).trim();
+                    cur.append(ln).append("\n");
+                } else if (cur != null) {
+                    cur.append(ln).append("\n");
+                }
+            }
+            if (cur != null) addSection(curTitle, cur.toString());
+
+            // 默认选中最新那一版（第 0 项是「全部」）
+            sel = sections.size() > 1 ? 1 : 0;
+        }
+
+        void addSection(String title, String body) {
+            if (title == null) return;
+            // 标题形如 "v2.1.2 —— 更新日志可以自动更新了"，标签上只取版本号
+            String label = title;
+            int sp = title.indexOf(' ');
+            if (sp > 0) label = title.substring(0, sp);
+            Sec s = new Sec();
+            s.label = label;
+            s.md = body;
+            sections.add(s);
+        }
+
+        void selectSection(int i) {
+            if (i < 0 || i >= sections.size() || i == sel) return;
+            sel = i;
+            parse(sections.get(i).md);
+            scroll = 0;
+            scroller.forceFinished(true);
+            if (getWidth() > 0) measure();
+            invalidate();
         }
 
         void updateStatusText() {
@@ -145,8 +212,15 @@ public class DocActivity extends Activity {
                         public void run() {
                             busy = false;
                             if (ok) {
+                                String keep = sections.get(sel).label;
                                 md = Changelog.local(getContext());
-                                parse(md);
+                                buildSections(md);
+                                // 尽量停在原来那一版
+                                for (int i = 1; i < sections.size(); i++) {
+                                    if (sections.get(i).label.equals(keep)) { sel = i; break; }
+                                }
+                                if (sel == 0 && sections.size() > 1) sel = 1;
+                                parse(sections.get(sel).md);
                                 if (getWidth() > 0) measure();
                                 updateStatusText();
                                 String t = Changelog.cacheTime(getContext());
@@ -166,8 +240,7 @@ public class DocActivity extends Activity {
         // ---------------------------------------------------------- 解析
         static String plain(String s) {
             String t = s.replace("**", "").replace("`", "");
-            // 过滤掉控制字符（制表符除外）。曾经有一次源文件里混进了退格符 U+0008，
-            // 渲染出来像是少了一个字母，查了半天才发现是文件坏了。
+            // 过滤控制字符（制表符除外）。曾经源文件里混进过退格符 U+0008。
             StringBuilder sb = null;
             for (int i = 0; i < t.length(); i++) {
                 char c = t.charAt(i);
@@ -178,10 +251,6 @@ public class DocActivity extends Activity {
             return sb == null ? t : sb.toString();
         }
 
-        /**
-         * 把续行接到上一段后面。中文之间直接接，英文/数字之间补一个空格 ——
-         * 不然 "build" + ".ps1" 会粘成 "build.ps1" 少个空格，反之中文会多出空格。
-         */
         static String join(String a, String b) {
             if (a == null || a.length() == 0) return b;
             if (b == null || b.length() == 0) return a;
@@ -304,7 +373,6 @@ public class DocActivity extends Activity {
                 }
                 java.util.regex.Matcher om = ORDERED.matcher(l);
                 if (om.matches()) {
-                    // 有序列表：序号当标记画，不能让它掉进下面的续行分支被吸收
                     Blk b = mk(Ui.font(12.5f, false, Ui.TEXT_BODY), 0, Ui.px(GAP_BULLET), Ui.px(6));
                     b.text = plain(om.group(2));
                     b.marker = om.group(1) + ".";
@@ -319,7 +387,6 @@ public class DocActivity extends Activity {
                     continue;
                 }
                 if (l.length() == 0) {
-                    // 连续空行合并成一个，别把间距叠起来
                     if (!blocks.isEmpty() && blocks.get(blocks.size() - 1).spacer) continue;
                     Blk b = new Blk();
                     b.spacer = true;
@@ -329,11 +396,10 @@ public class DocActivity extends Activity {
                     blocks.add(b);
                     continue;
                 }
-                // lazy continuation：这一行没有块标记，就接到上一段 / 列表项后面。
-                // 不这么做的话，列表项在源码里换行的部分会掉到最左边，看着很乱。
+
+                // lazy continuation：没有块标记的行接到上一段 / 列表项后面
                 Blk prev = blocks.isEmpty() ? null : blocks.get(blocks.size() - 1);
-                if (prev != null && (prev.para || prev.bullet || prev.ruleBar))
-                {
+                if (prev != null && (prev.para || prev.bullet || prev.ruleBar)) {
                     prev.text = join(prev.text, plain(l));
                     continue;
                 }
@@ -405,18 +471,8 @@ public class DocActivity extends Activity {
                     y = b.y + (b.h - b.gapTop - b.gapBot) + b.gapBot;
                     continue;
                 }
-                if (b.spacer) {
-                    y += b.gapBot;
-                    b.y = y;
-                    continue;
-                }
-                if (b.divider) {
-                    b.y = y + b.gapTop;
-                    y = b.y + b.h + b.gapBot;
-                    continue;
-                }
-                // 列表项的文字是从项目符号右边开始的，换行宽度必须把那段缩进也扣掉，
-                // 否则续行会比可用宽度还长，看起来像是另一段
+                if (b.spacer) { y += b.gapBot; b.y = y; continue; }
+                if (b.divider) { b.y = y + b.gapTop; y = b.y + b.h + b.gapBot; continue; }
                 float extra = b.bullet ? (b.marker == null ? BULLET_INDENT : ORDER_INDENT) : 0;
                 b.lines = Ui.wrap(b.paint, b.text, w - b.indent - extra);
                 Paint.FontMetrics fm = b.paint.getFontMetrics();
@@ -426,9 +482,24 @@ public class DocActivity extends Activity {
                 y = b.y + b.h + b.gapBot;
             }
             contentH = y + Ui.px(28);
+            measureChips();
         }
 
-        /** 列宽先按内容自然宽度；装不下就按比例压，再装不下就削最宽的列。 */
+        void measureChips() {
+            chipRects.clear();
+            Paint p = Ui.font(12.5f, true, Ui.SUB);
+            float x = Ui.px(16);
+            for (Sec s : sections) {
+                float w = Math.max(Ui.px(54), p.measureText(s.label) + Ui.px(26));
+                chipRects.add(new RectF(x, 0, x + w, chipH));
+                x += w + Ui.px(8);
+            }
+            chipContentW = x + Ui.px(8);
+            float max = Math.max(0, chipContentW - getWidth());
+            if (chipScroll > max) chipScroll = max;
+            if (chipScroll < 0) chipScroll = 0;
+        }
+
         void measureTable(Blk b, float avail) {
             int n = b.rows[0].length;
             int[] natural = new int[n];
@@ -512,6 +583,7 @@ public class DocActivity extends Activity {
             Ui.roundRect(c, cardX, cardTop, w - cardX, cardBot, Ui.px(16), Ui.CARD);
 
             drawHeader(c, w);
+            drawChips(c, w);
 
             c.save();
             c.clipRect(cardX, cardTop, w - cardX, cardBot);
@@ -559,9 +631,7 @@ public class DocActivity extends Activity {
 
         void drawHeader(Canvas c, float w) {
             Ui.roundRect(c, 0, 0, w, headerH, 0, 0xFFFFFFFF);
-            Ui.roundRect(c, 0, headerH - 1, w, headerH, 0, Ui.LINE);
 
-            // 第一行：标题 + 按钮
             Ui.text(c, "更新日志", Ui.px(20), Ui.px(37), Ui.font(17, true, Ui.INK));
 
             float bh = Ui.px(34);
@@ -576,7 +646,6 @@ public class DocActivity extends Activity {
             Ui.roundRect(c, refreshRect, bh / 2, busy ? 0x14000000 : Ui.ACCENT_SOFT);
             Ui.textC(c, busy ? "拉取中" : "刷新", refreshRect, Ui.font(13, true, Ui.ACCENT));
 
-            // 第二行：状态（小圆点 + 文字，按可用宽度截断，不会压到按钮）
             int tone = busy ? Ui.ACCENT
                     : statusTone == TONE_OK ? Ui.GREEN
                     : statusTone == TONE_NEW ? Ui.AMBER
@@ -588,6 +657,27 @@ public class DocActivity extends Activity {
             Paint sp = Ui.font(11.5f, false, Ui.SUB);
             String shown = Ui.ellipsize(sp, status, w - Ui.px(40) - Ui.px(20));
             Ui.text(c, shown, Ui.px(35), Ui.px(66), sp);
+
+            Ui.roundRect(c, 0, headerH - 1, w, headerH, 0, Ui.LINE);
+        }
+
+        /** 版本标签行：横向可滑，点一个看一版 */
+        void drawChips(Canvas c, float w) {
+            c.save();
+            c.clipRect(0, chipTop, w, chipTop + chipH);
+
+            Paint p = Ui.font(12.5f, true, Ui.SUB);
+            Paint pOn = Ui.font(12.5f, true, 0xFFFFFFFF);
+            for (int i = 0; i < chipRects.size() && i < sections.size(); i++) {
+                RectF r = new RectF(chipRects.get(i));
+                r.offset(-chipScroll, chipTop);
+                if (r.right < -Ui.px(20) || r.left > w + Ui.px(20)) continue;
+
+                boolean on = (i == sel);
+                Ui.roundRect(c, r, r.height() / 2, on ? Ui.ACCENT : Ui.ACCENT_SOFT);
+                Ui.textC(c, sections.get(i).label, r, on ? pOn : p);
+            }
+            c.restore();
         }
 
         void drawTable(Canvas c, Blk b, float top, float w) {
@@ -650,24 +740,52 @@ public class DocActivity extends Activity {
         // ---------------------------------------------------------- 触摸
         @Override
         public boolean onTouchEvent(MotionEvent e) {
+            float y = e.getY();
+            boolean inChips = (y >= chipTop && y < chipTop + chipH);
+
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    downY = e.getY(); downScroll = scroll; dragging = false;
+                    downY = y; downScroll = scroll; downX = e.getX();
+                    dragging = false;
+                    dragChips = inChips;
                     scroller.forceFinished(true);
                     return true;
+
                 case MotionEvent.ACTION_MOVE:
-                    if (Math.abs(e.getY() - downY) > slop) dragging = true;
-                    if (dragging) {
-                        scroll = downScroll - (e.getY() - downY);
-                        clamp();
-                        invalidate();
+                    float dy = y - downY;
+                    if (dragChips) {
+                        if (Math.abs(dy) > slop || Math.abs(e.getX() - downX) > slop) dragging = true;
+                        if (dragging) {
+                            float max = Math.max(0, chipContentW - getWidth());
+                            chipScroll = Math.max(0, Math.min(max, chipScroll - (e.getX() - downX)));
+                            downX = e.getX();
+                            invalidate();
+                        }
+                    } else {
+                        if (Math.abs(dy) > slop) dragging = true;
+                        if (dragging) {
+                            scroll = downScroll - dy;
+                            clamp();
+                            invalidate();
+                        }
                     }
                     return true;
+
                 case MotionEvent.ACTION_UP:
+                    if (dragChips) {
+                        if (!dragging) {
+                            for (int i = 0; i < chipRects.size(); i++) {
+                                RectF r = new RectF(chipRects.get(i));
+                                r.offset(-chipScroll, chipTop);
+                                if (r.contains(e.getX(), y)) { selectSection(i); return true; }
+                            }
+                        }
+                        return true;
+                    }
                     if (!dragging) {
-                        float x = e.getX(), y = e.getY();
+                        float x = e.getX();
                         if (refreshRect.contains(x, y)) { fetchAsync(); return true; }
-                        if (closeRect.contains(x, y) || y < headerH) {
+                        if (closeRect.contains(x, y) || y < chipTop) {
                             ((Activity) getContext()).finish();
                             return true;
                         }
