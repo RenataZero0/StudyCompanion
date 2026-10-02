@@ -77,7 +77,8 @@ public class MainActivity extends Activity implements MainView.Listener {
                     final GitHub.Release rel = GitHub.latestRelease(MainActivity.this);
                     sp.edit().putString("lastUpdateCheck", today).apply();
                     if (rel.tag.length() == 0) return;
-                    if (rel.tag.equalsIgnoreCase(GitHub.VERSION_TAG)) return;
+                    // 远端不比本机新就什么都不做（之前用 equals，降级也会被当成升级）
+                    if (GitHub.compareVersion(rel.tag, GitHub.VERSION_TAG) <= 0) return;
                     if (rel.apkDownload(false).length() == 0) return;
                     runOnUiThread(new Runnable() {
                         public void run() { showUpdateDialog(rel); }
@@ -438,8 +439,13 @@ public class MainActivity extends Activity implements MainView.Listener {
 
     private void onUpdateChecked(GitHub.Release rel) {
         dismissBusy();
-        if (rel.tag.equalsIgnoreCase(GitHub.VERSION_TAG)) {
-            simple("已是最新版本", "当前：" + GitHub.VERSION_TAG + "\n最新：" + rel.tag);
+        int cmp = GitHub.compareVersion(rel.tag, GitHub.VERSION_TAG);
+        if (cmp == 0) {
+            simple("已是最新版本", "当前：" + GitHub.VERSION_TAG + "\n线上：" + rel.tag);
+            return;
+        }
+        if (cmp < 0) {
+            simple("本机版本比线上还新", "本机：" + GitHub.VERSION_TAG + "\n线上：" + rel.tag);
             return;
         }
         if (rel.apkUrl.length() == 0) {

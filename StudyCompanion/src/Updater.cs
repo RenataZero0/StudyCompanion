@@ -49,7 +49,8 @@ namespace StudyCompanion
                 try { string e2; Changelog.Fetch(out e2); } catch { }
 
                 if (rel == null || string.IsNullOrEmpty(rel.Tag)) return;
-                if (SameVersion(rel.Tag, GitHub.VersionTag)) return;
+                // 远端不比本机新就什么都不做（之前用 equals，降级也会被当成升级）
+                if (CompareVersion(rel.Tag, GitHub.VersionTag) <= 0) return;
                 if (string.IsNullOrEmpty(rel.ExeDownload(GitHub.LoggedIn))) return;
 
                 Post(delegate { Prompt(rel); });
@@ -73,7 +74,42 @@ namespace StudyCompanion
         /// <summary>版本号比较：忽略前面的 v，2.1.1 == v2.1.1</summary>
         public static bool SameVersion(string a, string b)
         {
-            return string.Equals(Clean(a), Clean(b), StringComparison.OrdinalIgnoreCase);
+            return CompareVersion(a, b) == 0;
+        }
+
+        /// <summary>
+        /// 数值比较版本号：a &gt; b 返回 1，相等 0，a &lt; b 返回 -1。
+        /// 不能只判断「相不相等」—— 那样远端版本比本机旧时也会被当成有新版本。
+        /// 也顺便修掉 2.1.10 &lt; 2.1.9 这种字符串比较的坑。
+        /// </summary>
+        public static int CompareVersion(string a, string b)
+        {
+            int[] pa = ParseVer(a), pb = ParseVer(b);
+            for (int i = 0; i < 3; i++)
+            {
+                if (pa[i] != pb[i]) return pa[i] > pb[i] ? 1 : -1;
+            }
+            return 0;
+        }
+
+        static int[] ParseVer(string v)
+        {
+            var r = new int[3];
+            v = Clean(v);
+            var parts = v.Split('.');
+            for (int i = 0; i < 3 && i < parts.Length; i++)
+            {
+                string digits = "";
+                foreach (char c in parts[i])
+                {
+                    if (c < '0' || c > '9') break;
+                    digits += c;
+                }
+                int n = 0;
+                int.TryParse(digits, out n);
+                r[i] = n;
+            }
+            return r;
         }
 
         static string Clean(string v)
@@ -165,9 +201,17 @@ namespace StudyCompanion
                     MessageBox.Show(owner, "没有查到版本信息（可能是网络问题）。", "检查更新");
                     return;
                 }
-                if (SameVersion(rel.Tag, GitHub.VersionTag))
+                int cmp = CompareVersion(rel.Tag, GitHub.VersionTag);
+                if (cmp == 0)
                 {
                     MessageBox.Show(owner, "已经是最新版本 " + GitHub.VersionTag + "。", "检查更新");
+                    return;
+                }
+                if (cmp < 0)
+                {
+                    MessageBox.Show(owner,
+                        "本机版本比线上还新。\n\n本机：" + GitHub.VersionTag + "\n线上：" + rel.Tag,
+                        "检查更新");
                     return;
                 }
                 Prompt(rel);

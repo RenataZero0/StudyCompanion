@@ -584,6 +584,7 @@ namespace StudyCompanion
             // 想要表格直接去仓库下载 sync/StudyRecord.csv
             _tools.AddGroup("其他");
             _tools.AddButton("查看更新日志", delegate { ShowChangelog(); }, false);
+            _tools.AddButton("检查更新", delegate { CheckUpdateNow(); }, false);
             _tools.AddButton("回到今天", delegate { GoToday(); }, false);
 
             _tools.AddGroup("启动与关闭");

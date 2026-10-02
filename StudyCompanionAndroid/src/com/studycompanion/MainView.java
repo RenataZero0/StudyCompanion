@@ -765,7 +765,8 @@ public class MainView extends View {
         List<String[]> gs = new ArrayList<String[]>();
         // 「导出/导入 CSV」已去掉 —— 打卡记录和 CSV 都会在同步时自动传到 GitHub，
         // 想要表格直接去仓库下载 sync/StudyRecord.csv
-        gs.add(new String[]{"其他", "查看更新日志", "回到今天"});
+        // 「检查更新」放在这里而不是 GitHub 组里 —— 仓库是公开的，查更新不需要登录
+        gs.add(new String[]{"其他", "查看更新日志", "检查更新", "回到今天"});
         gs.add(new String[]{"提醒", Store.autoRemind() ? "到点提醒：已开启" : "到点提醒：已关闭"});
 
         boolean cfg = GitHub.configured();
@@ -777,7 +778,7 @@ public class MainView extends View {
             gs.add(new String[]{"GitHub 同步", "登录 GitHub",
                     "\u0001登录后会自动同步打卡记录，并把 CSV 传到云端"});
         } else {
-            gs.add(new String[]{"GitHub 同步", "立即同步", "检查更新", "退出登录",
+            gs.add(new String[]{"GitHub 同步", "立即同步", "退出登录",
                     "\u0001已登录：" + GitHub.user(getContext())});
         }
         return gs;

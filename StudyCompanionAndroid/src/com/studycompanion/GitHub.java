@@ -34,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.1.3";
+    public static final String VERSION_TAG = "v2.1.4";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -52,6 +52,35 @@ public class GitHub {
     }
 
     // ================================================================== 令牌
+    /**
+     * 数值比较版本号：a &gt; b 返回 1，相等 0，a &lt; b 返回 -1。
+     * 不能只判断「相不相等」—— 那样远端版本比本机旧时也会被当成有新版本。
+     * 顺便也修掉 2.1.10 &lt; 2.1.9 这种字符串比较的坑。
+     */
+    public static int compareVersion(String a, String b) {
+        int[] pa = parseVer(a), pb = parseVer(b);
+        for (int i = 0; i < 3; i++) if (pa[i] != pb[i]) return pa[i] > pb[i] ? 1 : -1;
+        return 0;
+    }
+
+    static int[] parseVer(String v) {
+        int[] r = new int[3];
+        if (v == null) return r;
+        v = v.trim();
+        if (v.startsWith("v") || v.startsWith("V")) v = v.substring(1);
+        String[] parts = v.split("\\.");
+        for (int i = 0; i < 3 && i < parts.length; i++) {
+            String d = "";
+            for (int k = 0; k < parts[i].length(); k++) {
+                char c = parts[i].charAt(k);
+                if (c < '0' || c > '9') break;
+                d += c;
+            }
+            try { r[i] = Integer.parseInt(d); } catch (Exception ignored) { }
+        }
+        return r;
+    }
+
     private static SharedPreferences sp(Context c) {
         return c.getApplicationContext().getSharedPreferences("study", Context.MODE_PRIVATE);
     }
