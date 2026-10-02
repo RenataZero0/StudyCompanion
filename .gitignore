@@ -45,3 +45,8 @@ _release_notes.md
 # 桌面端 GitHub 自检临时产物
 StudyCompanion/_test/
 
+
+# 桌面端自检可执行文件
+StudyCompanion/ghtest.exe
+StudyCompanion/assetprobe.exe
+

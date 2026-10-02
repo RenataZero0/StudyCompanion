@@ -49,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.0.2";
+        public const string VersionTag = "v2.0.3";
 
         public const string SyncPath = "sync/progress.txt";
 
@@ -275,10 +275,20 @@ namespace StudyCompanion
             throw new Exception("等待超时，请重新登录");
         }
 
-        public static string CurrentUser()
+        public static string CurrentUser() { return CurrentUser(Token); }
+
+        /// <summary>用指定令牌取当前登录用户名（刚拿到令牌、还没存下来时用）</summary>
+        public static string CurrentUser(string token)
         {
-            var d = Api("GET", "/user", null);
-            return Str(d, "login");
+            try
+            {
+                if (string.IsNullOrEmpty(token)) return "";
+                var r = Req("GET", ApiBase + "/user", token, "application/vnd.github+json");
+                string text;
+                using (var resp = (HttpWebResponse)r.GetResponse()) text = ReadBody(resp);
+                return Str(Json.Deserialize<Dictionary<string, object>>(text), "login");
+            }
+            catch { return ""; }
         }
 
         // ============================================================== Release
@@ -296,18 +306,25 @@ namespace StudyCompanion
             rel.Name = Str(d, "name");
             rel.Notes = Str(d, "body");
             rel.PageUrl = Str(d, "html_url");
+
             object assetsObj;
-            if (d.TryGetValue("assets", out assetsObj) && assetsObj is object[])
+            if (d.TryGetValue("assets", out assetsObj) && assetsObj != null)
             {
-                foreach (var a in (object[])assetsObj)
+                // 注意：JavaScriptSerializer 把嵌套数组反序列化成 ArrayList，**不是** object[]，
+                // 所以这里按 IEnumerable 处理，两种类型都能吃。
+                var arr = assetsObj as System.Collections.IEnumerable;
+                if (arr != null && !(assetsObj is string))
                 {
-                    var m = a as Dictionary<string, object>;
-                    if (m == null) continue;
-                    string n = Str(m, "name");
-                    if (n.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
-                    { rel.ApkUrl = Str(m, "url"); rel.ApkSize = Long(m, "size"); }
-                    else if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                    { rel.ExeUrl = Str(m, "url"); rel.ExeSize = Long(m, "size"); }
+                    foreach (object a in arr)
+                    {
+                        var m = a as Dictionary<string, object>;
+                        if (m == null) continue;
+                        string n = Str(m, "name");
+                        if (n.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
+                        { rel.ApkUrl = Str(m, "url"); rel.ApkSize = Long(m, "size"); }
+                        else if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                        { rel.ExeUrl = Str(m, "url"); rel.ExeSize = Long(m, "size"); }
+                    }
                 }
             }
             return rel;
