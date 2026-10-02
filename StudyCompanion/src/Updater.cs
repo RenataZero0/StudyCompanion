@@ -119,21 +119,43 @@ namespace StudyCompanion
             return v.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? v.Substring(1) : v;
         }
 
-        /// <summary>发现新版本时的提示（可能在托盘模式下弹出，所以没有 owner）</summary>
+        /// <summary>
+        /// 发现新版本时的提示。
+        /// 用正经的对话框 + MarkdownView 渲染改动说明 ——
+        /// 以前是塞进 MessageBox，原始 Markdown 全露在外面。
+        /// </summary>
         static void Prompt(GitHub.Release rel)
         {
-            string notes = rel.Notes == null ? "" : rel.Notes;
-            if (notes.Length > 420) notes = notes.Substring(0, 420) + "…";
-
             var owner = MainForm.Instance;
-            var ans = MessageBox.Show(owner,
-                "发现新版本 " + rel.Tag + "\n当前：" + GitHub.VersionTag
-                + "\n大小：" + (rel.ExeSize / 1024) + " KB\n\n" + notes
-                + "\n\n现在下载并安装吗？",
-                "学习助手 · 发现新版本", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
-            if (ans != DialogResult.OK) return;
 
-            DownloadAndReplace(rel, owner);
+            UpdateDialog dlg = null;
+            try
+            {
+                dlg = new UpdateDialog(rel);
+                if (owner != null && owner.Visible) dlg.ShowDialog(owner);
+                else dlg.ShowDialog();
+            }
+            catch
+            {
+                // 万一对话框出问题，退回到最简单的提示
+                var ans = MessageBox.Show(owner,
+                    "发现新版本 " + rel.Tag + "\n当前：" + GitHub.VersionTag
+                    + "\n\n现在下载并安装吗？",
+                    "学习助手 · 发现新版本", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+                if (ans == DialogResult.OK) DownloadAndReplace(rel, owner);
+                return;
+            }
+
+            if (dlg.Result == UpdateDialog.Choice.Download) DownloadAndReplace(rel, owner);
+            else if (dlg.Result == UpdateDialog.Choice.ReleasePage)
+            {
+                try
+                {
+                    string url = rel.PageUrl;
+                    if (!string.IsNullOrEmpty(url)) System.Diagnostics.Process.Start(url);
+                }
+                catch { }
+            }
         }
 
         /// <summary>下载新 exe 并替换自己、重启</summary>

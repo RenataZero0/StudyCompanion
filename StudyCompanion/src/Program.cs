@@ -112,6 +112,34 @@ namespace StudyCompanion
                 return;
             }
 
+            // 升级对话框：离屏渲染一下，方便检查排版
+            if (Path.GetFileName(path).ToLower().Contains("update"))
+            {
+                var rel = new GitHub.Release();
+                rel.Tag = "v9.9.9";
+                rel.Name = "测试版本";
+                rel.PageUrl = "https://github.com/RenataZero0/StudyCompanion/releases";
+                rel.ExeSize = 211456;
+                rel.Notes = Changelog.SectionOf(Changelog.Local(),
+                    Changelog.LatestVersionIn(Changelog.Local()));
+                if (string.IsNullOrEmpty(rel.Notes)) rel.Notes = "（没有改动说明）";
+
+                var d = new UpdateDialog(rel);
+                d.ShowInTaskbar = false;
+                d.StartPosition = FormStartPosition.Manual;
+                d.Location = new Point(-4000, -4000);
+                d.Show();
+                for (int i = 0; i < 40; i++) { Application.DoEvents(); System.Threading.Thread.Sleep(20); }
+                using (var b = new Bitmap(d.Width, d.Height))
+                {
+                    d.DrawToBitmap(b, new Rectangle(0, 0, d.Width, d.Height));
+                    b.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                }
+                d.Close();
+                Console.WriteLine("update snapshot -> " + path + "  | 说明长度=" + rel.Notes.Length);
+                return;
+            }
+
             if (Path.GetFileName(path).ToLower().Contains("doc"))
             {
                 // 有 --md 就直接渲染指定文件（用来单独测 Markdown 渲染，不联网）
