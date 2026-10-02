@@ -24,10 +24,16 @@ namespace StudyCompanion
         bool _busy;
         bool _fetchedOnce;
 
+        readonly bool _autoFetch = true;
+
         public DocViewer(string title) : this(title, null) { }
 
-        public DocViewer(string title, string markdown)
+        public DocViewer(string title, string markdown) : this(title, markdown, true) { }
+
+        /// <summary>autoFetch=false 时不会自动联网（离线预览 / 测试渲染用）</summary>
+        public DocViewer(string title, string markdown, bool autoFetch)
         {
+            _autoFetch = autoFetch;
             Text = title;
             BackColor = Ui.Bg;
             StartPosition = FormStartPosition.CenterParent;
@@ -45,21 +51,24 @@ namespace StudyCompanion
             Controls.Add(head);
 
             var lab = new Label();
-            lab.Text = title;
+            // 顶栏里只写「更新日志」——窗口标题栏已经有全名了，写全名会和右边的状态文字撞上
+            lab.Text = "更新日志";
             lab.Font = Ui.F(12f, true);
             lab.ForeColor = Ui.Ink;
             lab.AutoSize = false;
             lab.TextAlign = ContentAlignment.MiddleLeft;
             lab.BackColor = Color.White;
-            lab.SetBounds(Ui.Px(22), 0, Ui.Px(300), head.Height);
+            lab.SetBounds(Ui.Px(22), 0, Ui.Px(140), head.Height);
             head.Controls.Add(lab);
 
+            // 状态靠右对齐（贴着「刷新」按钮），文字要短，否则会和标题撞上
             _status.AutoSize = false;
-            _status.TextAlign = ContentAlignment.MiddleLeft;
+            _status.TextAlign = ContentAlignment.MiddleRight;
             _status.ForeColor = Ui.Sub;
             _status.Font = Ui.F(8.5f);
             _status.BackColor = Color.White;
-            _status.SetBounds(Ui.Px(236), 0, Ui.Px(330), head.Height);
+            _status.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _status.SetBounds(ClientSize.Width - Ui.Px(220) - Ui.Px(360), 0, Ui.Px(360), head.Height);
             head.Controls.Add(_status);
 
             var close = new Pill();
@@ -94,7 +103,7 @@ namespace StudyCompanion
             card.Controls.Add(_view);
 
             SetContent(markdown ?? Changelog.Local());
-            Shown += delegate { if (!_fetchedOnce) FetchAsync(); };
+            Shown += delegate { if (_autoFetch && !_fetchedOnce) FetchAsync(); };
         }
 
         // ================================================================ 内容
@@ -112,15 +121,15 @@ namespace StudyCompanion
             string local = GitHub.VersionTag.TrimStart('v', 'V');
             string src = Changelog.HasCache ? "GitHub" : "内置";
 
+            // 文字要短 —— 这段是右对齐贴在「刷新」按钮左边的
             string s;
             if (latest.Length == 0) s = "来源：" + src;
-            else if (local.Length == 0) s = "最新 v" + latest + "　来源：" + src;
             else if (string.Equals(latest, local, StringComparison.OrdinalIgnoreCase))
-                s = "当前 v" + local + "　已是最新";
+                s = "已是最新（v" + local + "）";
             else
-                s = "当前 v" + local + "　日志已到 v" + latest;
+                s = "日志已到 v" + latest + "　本机 v" + local;
 
-            if (showSource && !Changelog.HasCache) s += "（尚未联网更新）";
+            if (showSource && !Changelog.HasCache) s = "未联网　·　" + s;
             _status.Text = s;
         }
 
@@ -154,7 +163,7 @@ namespace StudyCompanion
             {
                 SetContent(Changelog.Local());
                 DateTime? t = Changelog.CacheTime;
-                _status.Text += t.HasValue ? "　·　" + t.Value.ToString("MM-dd HH:mm") + " 更新" : "";
+                _status.Text += t.HasValue ? "　·　" + t.Value.ToString("HH:mm") + " 更新" : "";
             }
             else
             {

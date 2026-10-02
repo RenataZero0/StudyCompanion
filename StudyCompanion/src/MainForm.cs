@@ -613,7 +613,7 @@ namespace StudyCompanion
 
             _inst = this;
             FillGitHubUser();
-            AutoCheckUpdate();
+            // 自动检查更新已在 Program.Main 里由 Updater 起线程，这里不再重复
             _status.GhClick += delegate { OpenGitHub(); };
             _rightFlow.Resize += delegate { LayoutRight(); };
             _leftScroll.Resize += delegate { LayoutLeft(); };
@@ -888,6 +888,7 @@ namespace StudyCompanion
 
         // ---------------------------------------------------------------- GitHub 入口
         static MainForm _inst;
+        public static MainForm Instance { get { return _inst; } }
 
         void OpenGitHub()
         {
@@ -922,99 +923,10 @@ namespace StudyCompanion
         /// 启动时自动查一次有没有新版（仓库公开，不需要登录就能查）。
         /// 每天最多查一次，避免每次开都弹；查不到就静默跳过，不打扰。
         /// </summary>
-        void AutoCheckUpdate()
+        /// <summary>托盘/工具卡上的「检查更新」——真正的逻辑在 Updater 里</summary>
+        void CheckUpdateNow()
         {
-            string today = DateTime.Today.ToString("yyyy-MM-dd");
-            string stamp = Path.Combine(Store.DataDir, "lastupdate.txt");
-            try
-            {
-                if (File.Exists(stamp) && File.ReadAllText(stamp).Trim() == today) return;
-            }
-            catch { }
-
-            var w = new System.ComponentModel.BackgroundWorker();
-            w.DoWork += delegate
-            {
-                try
-                {
-                    var rel = GitHub.LatestRelease();
-                    try { File.WriteAllText(stamp, today); } catch { }
-                    // 顺手把更新日志也刷一下，这样打开阅读器就是最新的
-                    try { string e2; Changelog.Fetch(out e2); } catch { }
-                    if (string.IsNullOrEmpty(rel.Tag)) return;
-                    if (string.Equals(rel.Tag, GitHub.VersionTag, StringComparison.OrdinalIgnoreCase)) return;
-                    if (string.IsNullOrEmpty(rel.ExeDownload(GitHub.LoggedIn))) return;
-
-                    BeginInvoke((MethodInvoker)delegate
-                    {
-                        string notes = rel.Notes == null ? "" : rel.Notes;
-                        if (notes.Length > 420) notes = notes.Substring(0, 420) + "…";
-                        var ans = MessageBox.Show(this,
-                            "发现新版本 " + rel.Tag + "\n当前：" + GitHub.VersionTag
-                            + "\n大小：" + (rel.ExeSize / 1024) + " KB\n\n" + notes
-                            + "\n\n现在下载并安装吗？",
-                            "发现新版本", MessageBoxButtons.OKCancel);
-                        if (ans == DialogResult.OK) AutoDownload(rel);
-                    });
-                }
-                catch
-                {
-                    // 没网 / 被墙 / 限流都无所谓，静默跳过
-                }
-            };
-            w.RunWorkerAsync();
-        }
-
-        /// <summary>自动检查发现新版时的下载（不依赖 GitHubForm）</summary>
-        void AutoDownload(GitHub.Release rel)
-        {
-            string tmp = Path.Combine(Path.GetTempPath(), "StudyCompanion-" + rel.Tag + ".exe");
-            try
-            {
-                Cursor = Cursors.WaitCursor;
-                if (File.Exists(tmp)) File.Delete(tmp);
-                GitHub.Download(rel.ExeDownload(GitHub.LoggedIn), tmp, null);
-                Cursor = Cursors.Default;
-                MessageBox.Show(this, "已下载到：\n" + tmp + "\n\n点「确定」后程序会退出并自动替换、重启。", "下载完成");
-                ReplaceSelf2(tmp);
-            }
-            catch (Exception ex)
-            {
-                Cursor = Cursors.Default;
-                MessageBox.Show(this, "下载失败：" + ex.Message, "提示");
-            }
-        }
-
-        /// <summary>
-        /// 正在运行的 exe 不能被覆盖，写个批处理：等本进程退出 → 覆盖 → 重启。
-        /// </summary>
-        void ReplaceSelf2(string newExe)
-        {
-            try
-            {
-                string self = Application.ExecutablePath;
-                string bat = Path.Combine(Path.GetTempPath(), "sc-update.bat");
-                var sb = new StringBuilder();
-                sb.AppendLine("@echo off");
-                sb.AppendLine("ping 127.0.0.1 -n 3 > nul");
-                sb.AppendLine(":retry");
-                sb.AppendLine("copy /y \"" + newExe + "\" \"" + self + "\" > nul 2>&1");
-                sb.AppendLine("if errorlevel 1 ( ping 127.0.0.1 -n 2 > nul & goto retry )");
-                sb.AppendLine("del \"" + newExe + "\" > nul 2>&1");
-                sb.AppendLine("start \"\" \"" + self + "\"");
-                sb.AppendLine("del \"%~f0\" > nul 2>&1");
-                File.WriteAllText(bat, sb.ToString(), Encoding.Default);
-
-                var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c \"" + bat + "\"");
-                psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-                psi.UseShellExecute = true;
-                System.Diagnostics.Process.Start(psi);
-                ForceQuit();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "自动替换失败：" + ex.Message, "提示");
-            }
+            Updater.CheckManually(this);
         }
 
         /// <summary>登录状态变了 —— 刷新顶栏那个按钮</summary>

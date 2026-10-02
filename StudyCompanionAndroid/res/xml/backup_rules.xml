@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 及以前的自动备份规则。
+  把登录令牌（SharedPreferences "study"）和学习记录包进去，
+  这样重装 / 换机时系统能把它们恢复回来，不用重新登录。
+-->
+<full-backup-content>
+    <include domain="sharedpref" path="study.xml"/>
+    <include domain="file" path="CHANGELOG.md"/>
+</full-backup-content>

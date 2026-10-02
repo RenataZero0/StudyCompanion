@@ -99,6 +99,9 @@ namespace StudyCompanion.Setup
             // --- 3. 课表与课本索引 ---
             p.Report(55, "正在写入课表与课本索引…");
             Res.Extract("App.Schedule.xlsx", Path.Combine(dir, "Schedule.xlsx"), true);
+            // 更新日志：和 exe 放一起，作为离线兜底
+            // （运行时会优先用从 GitHub 拉下来的那份，放在 %APPDATA% 里）
+            Res.Extract("App.CHANGELOG.md", Path.Combine(dir, "CHANGELOG.md"), true);
             Directory.CreateDirectory(Path.Combine(dir, "data"));
             Res.Extract("App.books.tsv", Path.Combine(dir, "data", "books.tsv"), true);
             Res.Extract("App.pages.tsv", Path.Combine(dir, "data", "pages.tsv"), true);

@@ -25,7 +25,8 @@ $sched = Join-Path (Split-Path -Parent $appDir) "Schedule.xlsx"
 $books = Join-Path $appDir "data\books.tsv"
 $pages = Join-Path $appDir "data\pages.tsv"
 $ico   = Join-Path $appDir "assets\app.ico"
-foreach ($p in @($exe, $sched, $books, $pages, $ico)) {
+$chg   = Join-Path (Split-Path -Parent $appDir) "CHANGELOG.md"
+foreach ($p in @($exe, $sched, $books, $pages, $ico, $chg)) {
     if (-not (Test-Path $p)) { throw "missing input: $p" }
 }
 
@@ -59,6 +60,7 @@ if (Test-Path $target) { Remove-Item $target -Force }
     "/resource:$sched,App.Schedule.xlsx" `
     "/resource:$books,App.books.tsv" `
     "/resource:$pages,App.pages.tsv" `
+    "/resource:$chg,App.CHANGELOG.md" `
     /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Core.dll `
     $srcs
 

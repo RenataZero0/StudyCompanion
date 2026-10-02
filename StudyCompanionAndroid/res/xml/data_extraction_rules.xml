@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ 的备份 / 换机迁移规则。
+  cloud  : 云备份（重装后能恢复）
+  device : 换机直传
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="study.xml"/>
+        <include domain="file" path="CHANGELOG.md"/>
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="study.xml"/>
+        <include domain="file" path="CHANGELOG.md"/>
+    </device-transfer>
+</data-extraction-rules>

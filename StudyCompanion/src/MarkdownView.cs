@@ -9,7 +9,8 @@ namespace StudyCompanion
 {
     /// <summary>
     /// 轻量 Markdown 阅读控件（自绘 + 自管滚动）。
-    /// 支持：# / ## / ### 标题、- 项目符号、&gt; 引用、行内 **粗体** 与 `代码`、``` 代码块。
+    /// 支持：# / ## / ### 标题、- 项目符号、&gt; 引用、**粗体**、`代码`、``` 代码块，
+    /// 以及 **Markdown 表格**（带表头底色、行分隔线、列宽自适应）。
     /// </summary>
     public class MarkdownView : Control
     {
@@ -26,12 +27,26 @@ namespace StudyCompanion
             public List<string> Lines = new List<string>();
             public int Y;
             public int Height;
+
+            // ---- 表格 ----
+            public bool Table;
+            public List<string[]> Rows;       // Rows[0] 是表头
+            public int[] ColW;                // 每列宽度（含内边距）
+            public int[] Align;               // 0 左 1 中 2 右
+            public List<int> RowH = new List<int>();
+            public List<List<List<string>>> CellLines;   // 每格换行后的文本
         }
 
         readonly List<Block> _blocks = new List<Block>();
         readonly VScrollBar _bar = new VScrollBar();
         int _contentH;
         int Pad { get { return Ui.Px(22); } }
+
+        // 表格样式
+        int CellPadX { get { return Ui.Px(10); } }
+        int CellPadY { get { return Ui.Px(7); } }
+        static readonly Color HeadBg = ColorTranslator.FromHtml("#F3F5F9");
+        static readonly Color BodyInk = ColorTranslator.FromHtml("#3C4A60");
 
         public MarkdownView()
         {
@@ -62,8 +77,9 @@ namespace StudyCompanion
             bool inCode = false;
             bool first = true;
 
-            foreach (var raw in lines)
+            for (int i = 0; i < lines.Length; i++)
             {
+                string raw = lines[i];
                 string line = raw.TrimEnd();
                 if (line.TrimStart().StartsWith("```")) { inCode = !inCode; continue; }
 
@@ -73,26 +89,71 @@ namespace StudyCompanion
                     continue;
                 }
 
+                // ---------------- 表格 ----------------
+                if (line.TrimStart().StartsWith("|"))
+                {
+                    var rows = new List<string[]>();
+                    var aligns = new List<int>();
+                    int j = i;
+                    bool sepSeen = false;
+                    while (j < lines.Length && lines[j].TrimStart().StartsWith("|"))
+                    {
+                        string t = lines[j].Trim();
+                        if (IsTableSeparator(t))
+                        {
+                            sepSeen = true;
+                            aligns = ParseAligns(t);
+                        }
+                        else if (t.Length > 1)
+                        {
+                            rows.Add(SplitRow(t));
+                        }
+                        j++;
+                    }
+                    // 至少要有一行内容，并且有 --- 分隔行才算表格；否则当普通文本
+                    if (rows.Count > 0 && sepSeen)
+                    {
+                        int n = 0;
+                        foreach (var r in rows) if (r.Length > n) n = r.Length;
+                        for (int k = 0; k < rows.Count; k++)
+                        {
+                            var r = rows[k];
+                            if (r.Length < n)
+                            {
+                                var bigger = new string[n];
+                                Array.Copy(r, bigger, r.Length);
+                                for (int q = r.Length; q < n; q++) bigger[q] = "";
+                                rows[k] = bigger;
+                            }
+                        }
+                        while (aligns.Count < n) aligns.Add(0);
+                        _blocks.Add(new Block { Table = true, Rows = rows, Align = aligns.ToArray(), Font = Ui.F(9.5f) });
+                        i = j - 1;
+                        first = false;
+                        continue;
+                    }
+                }
+
                 int level = 0;
-                string t = line;
-                while (t.StartsWith("#")) { level++; t = t.Substring(1); }
-                t = t.TrimStart();
+                string t2 = line;
+                while (t2.StartsWith("#")) { level++; t2 = t2.Substring(1); }
+                t2 = t2.TrimStart();
 
                 if (level == 1)
                 {
-                    Add(Plain(t), Ui.F(17f, true), Ui.Ink, first ? 0 : Ui.Px(10), 0, false, false);
+                    Add(Plain(t2), Ui.F(17f, true), Ui.Ink, first ? 0 : Ui.Px(10), 0, false, false);
                     first = false;
                     continue;
                 }
                 if (level == 2)
                 {
-                    Add(Plain(t), Ui.F(13.5f, true), Ui.Accent, Ui.Px(26), 0, false, false);
+                    Add(Plain(t2), Ui.F(13.5f, true), Ui.Accent, Ui.Px(26), 0, false, false);
                     first = false;
                     continue;
                 }
                 if (level >= 3)
                 {
-                    Add(Plain(t), Ui.F(11.5f, true), Ui.Ink, Ui.Px(16), 0, false, false);
+                    Add(Plain(t2), Ui.F(11.5f, true), Ui.Ink, Ui.Px(16), 0, false, false);
                     first = false;
                     continue;
                 }
@@ -105,7 +166,7 @@ namespace StudyCompanion
                 }
                 if (l.StartsWith("- ") || l.StartsWith("* "))
                 {
-                    Add(Plain(l.Substring(2)), Ui.F(10f), ColorTranslator.FromHtml("#3C4A60"), Ui.Px(3), Ui.Px(12), true, false);
+                    Add(Plain(l.Substring(2)), Ui.F(10f), BodyInk, Ui.Px(3), Ui.Px(12), true, false);
                     continue;
                 }
                 if (l.StartsWith("> "))
@@ -113,14 +174,9 @@ namespace StudyCompanion
                     Add(Plain(l.Substring(2)), Ui.F(9.5f), Ui.Sub, Ui.Px(4), Ui.Px(12), false, false);
                     continue;
                 }
-                if (l.StartsWith("|"))
-                {
-                    Add(Plain(l), Ui.F(8.5f), Ui.Sub, 0, Ui.Px(6), false, false);
-                    continue;
-                }
                 if (l.Length == 0) { Add("", Ui.F(6f), Ui.Sub, Ui.Px(4), 0, false, false); continue; }
 
-                Add(Plain(l), Ui.F(10f), ColorTranslator.FromHtml("#3C4A60"), Ui.Px(2), 0, false, false);
+                Add(Plain(l), Ui.F(10f), BodyInk, Ui.Px(2), 0, false, false);
                 first = false;
             }
             Measure();
@@ -140,6 +196,47 @@ namespace StudyCompanion
             if (c != '-' && c != '*' && c != '_') return false;
             foreach (char ch in t) if (ch != c && ch != ' ') return false;
             return true;
+        }
+
+        // ------------------------------------------------------------------ 表格小工具
+        /// <summary>| --- | :--: | ---: | 这种行</summary>
+        static bool IsTableSeparator(string t)
+        {
+            if (!t.StartsWith("|")) return false;
+            bool hasDash = false;
+            foreach (char ch in t)
+            {
+                if (ch == '-') { hasDash = true; continue; }
+                if (ch == '|' || ch == ':' || ch == ' ') continue;
+                return false;
+            }
+            return hasDash;
+        }
+
+        static List<int> ParseAligns(string sep)
+        {
+            var list = new List<int>();
+            var cells = SplitRow(sep);
+            foreach (var c in cells)
+            {
+                string s = c.Trim();
+                bool l = s.StartsWith(":");
+                bool r = s.EndsWith(":");
+                if (l && r) list.Add(1);
+                else if (r) list.Add(2);
+                else list.Add(0);
+            }
+            return list;
+        }
+
+        static string[] SplitRow(string t)
+        {
+            string s = t.Trim();
+            if (s.StartsWith("|")) s = s.Substring(1);
+            if (s.EndsWith("|")) s = s.Substring(0, s.Length - 1);
+            var parts = s.Split('|');
+            for (int i = 0; i < parts.Length; i++) parts[i] = Plain(parts[i].Trim());
+            return parts;
         }
 
         // ------------------------------------------------------------------ 排版测量
@@ -163,6 +260,88 @@ namespace StudyCompanion
             return res;
         }
 
+        void MeasureTable(Graphics g, Block b, int avail)
+        {
+            int n = b.Rows[0].Length;
+            var natural = new int[n];
+            for (int c = 0; c < n; c++) natural[c] = Ui.Px(46);      // 每列至少这么宽
+
+            // 表头用粗体量，正文用普通体
+            using (var hf = new Font(b.Font, FontStyle.Bold))
+            {
+                foreach (var row in b.Rows)
+                {
+                    Font f = (row == b.Rows[0]) ? hf : b.Font;
+                    for (int c = 0; c < n && c < row.Length; c++)
+                    {
+                        int wNeed = (int)Math.Ceiling(g.MeasureString(row[c], f).Width) + CellPadX * 2;
+                        if (wNeed > natural[c]) natural[c] = wNeed;
+                    }
+                }
+            }
+
+            int sep = 1;
+            int total = 0;
+            foreach (int v in natural) total += v;
+            total += sep * (n - 1);
+
+            b.ColW = new int[n];
+            if (total <= avail)
+            {
+                // 有余量就把多出来的按比例分给各列，别让表格缩在一边
+                int extra = avail - total;
+                for (int c = 0; c < n; c++)
+                    b.ColW[c] = natural[c] + extra * natural[c] / Math.Max(1, total);
+                int used = 0;
+                foreach (int v in b.ColW) used += v;
+                b.ColW[n - 1] += avail - used - sep * (n - 1);
+            }
+            else
+            {
+                int budget = avail - sep * (n - 1);
+                int minW = Ui.Px(54);
+                int sum = 0;
+                for (int c = 0; c < n; c++) { b.ColW[c] = Math.Max(minW, natural[c] * budget / Math.Max(1, total)); sum += b.ColW[c]; }
+                // 还超就削最宽的那列
+                int guard = 0;
+                while (sum > budget && guard++ < 200)
+                {
+                    int widest = 0;
+                    for (int c = 1; c < n; c++) if (b.ColW[c] > b.ColW[widest]) widest = c;
+                    if (b.ColW[widest] <= minW) break;
+                    b.ColW[widest] -= Ui.Px(4);
+                    sum -= Ui.Px(4);
+                }
+            }
+
+            // 每个格子的换行结果 + 行高
+            b.CellLines = new List<List<List<string>>>();
+            b.RowH.Clear();
+            using (var hf = new Font(b.Font, FontStyle.Bold))
+            {
+                foreach (var row in b.Rows)
+                {
+                    bool head = (row == b.Rows[0]);
+                    Font f = head ? hf : b.Font;
+                    int lh = (int)Math.Ceiling(f.GetHeight(g) * 1.35f);
+                    var rowCells = new List<List<string>>();
+                    int maxLines = 1;
+                    for (int c = 0; c < n; c++)
+                    {
+                        var ls = Wrap(g, c < row.Length ? row[c] : "", f, b.ColW[c] - CellPadX * 2);
+                        rowCells.Add(ls);
+                        if (ls.Count > maxLines) maxLines = ls.Count;
+                    }
+                    b.CellLines.Add(rowCells);
+                    b.RowH.Add(maxLines * lh + CellPadY * 2);
+                }
+            }
+
+            int h = 0;
+            foreach (int v in b.RowH) h += v;
+            b.Height = h + b.Gap;
+        }
+
         void Measure()
         {
             int w = ClientSize.Width - Pad * 2 - _bar.Width;
@@ -172,6 +351,14 @@ namespace StudyCompanion
                 int y = Pad;
                 foreach (var b in _blocks)
                 {
+                    if (b.Table)
+                    {
+                        b.Gap = Ui.Px(16);
+                        MeasureTable(g, b, w);
+                        b.Y = y;
+                        y += b.Height;
+                        continue;
+                    }
                     int ind = b.Indent + (b.Bullet ? Ui.Px(16) : 0);
                     b.Lines = Wrap(g, b.Text, b.Font, w - ind);
                     int lh = (int)Math.Ceiling(b.Font.GetHeight(g) * (b.Code ? 1.15f : 1.42f));
@@ -233,6 +420,8 @@ namespace StudyCompanion
                 int top = blk.Y - sy;
                 if (top + blk.Height < 0 || top > ClientSize.Height) continue;
 
+                if (blk.Table) { DrawTable(g, blk, top, w); continue; }
+
                 int lh = blk.Lines.Count > 0 ? blk.Height / blk.Lines.Count : Ui.Px(16);
                 int x = Pad + blk.Indent;
 
@@ -257,6 +446,79 @@ namespace StudyCompanion
                 using (var b = new SolidBrush(blk.Color))
                     for (int i = 0; i < blk.Lines.Count; i++)
                         g.DrawString(blk.Lines[i], blk.Font, b, x, top + i * lh);
+            }
+        }
+
+        /// <summary>画一个 Markdown 表格</summary>
+        void DrawTable(Graphics g, Block b, int top, int w)
+        {
+            int n = b.ColW.Length;
+            int height = b.Height - b.Gap;
+            var outer = new Rectangle(Pad, top, w, height);
+            int radius = Ui.Px(8);
+
+            // 底：白色圆角块 + 细边框
+            Ui.FillRound(g, outer, radius, Color.White);
+            Ui.StrokeRound(g, outer, radius, Ui.Line, 1f);
+
+            using (var bold = new Font(b.Font, FontStyle.Bold))
+            {
+                // 表头底色（裁剪成圆角，免得四角露出来）
+                using (var path = Ui.Round(new Rectangle(Pad, top, w, b.RowH[0] + radius), radius))
+                {
+                    var old = g.Clip;
+                    g.SetClip(path);
+                    using (var hb = new SolidBrush(HeadBg))
+                        g.FillRectangle(hb, Pad, top, w, b.RowH[0]);
+                    g.Clip = old;
+                }
+
+                int y = top;
+                for (int r = 0; r < b.Rows.Count; r++)
+                {
+                    bool head = (r == 0);
+                    Font f = head ? bold : b.Font;
+                    int rh = b.RowH[r];
+                    int x = Pad;
+
+                    for (int c = 0; c < n; c++)
+                    {
+                        int cw = b.ColW[c];
+
+                        // 列分隔线（表头那一行不画，避免和底色叠一起显脏）
+                        if (c > 0 && !head)
+                        {
+                            using (var pen = new Pen(ColorTranslator.FromHtml("#EEF1F6"), 1))
+                                g.DrawLine(pen, x, y + Ui.Px(4), x, y + rh - Ui.Px(4));
+                        }
+
+                        var ls = b.CellLines[r][c];
+                        int lh = (int)Math.Ceiling(f.GetHeight(g) * 1.35f);
+                        int textH = ls.Count * lh;
+                        int ty = y + (rh - textH) / 2;
+
+                        using (var brush = new SolidBrush(head ? Ui.Ink : BodyInk))
+                        {
+                            for (int k = 0; k < ls.Count; k++)
+                            {
+                                float tw = g.MeasureString(ls[k], f).Width;
+                                float tx = x + CellPadX;
+                                if (b.Align[c] == 1) tx = x + (cw - tw) / 2f;
+                                else if (b.Align[c] == 2) tx = x + cw - CellPadX - tw;
+                                g.DrawString(ls[k], f, brush, tx, ty + k * lh);
+                            }
+                        }
+                        x += cw;
+                    }
+
+                    // 行分隔线
+                    y += rh;
+                    if (r < b.Rows.Count - 1)
+                    {
+                        using (var pen = new Pen(Ui.Line, 1))
+                            g.DrawLine(pen, Pad + 1, y, Pad + w - 1, y);
+                    }
+                }
             }
         }
     }

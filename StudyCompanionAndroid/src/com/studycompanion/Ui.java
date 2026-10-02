@@ -97,6 +97,12 @@ public class Ui {
     }
 
     /** 按宽度换行（中英文混排，逐字符断行即可） */
+    /** 是不是 ASCII 字母/数字 —— 这些不该从中间断开 */
+    static boolean wordChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '_' || c == '.' || c == '/';
+    }
+
     public static java.util.List<String> wrap(Paint p, String s, float maxW) {
         java.util.List<String> out = new java.util.ArrayList<String>();
         if (s == null) { out.add(""); return out; }
@@ -107,10 +113,17 @@ public class Ui {
             if (ch == '\n') { out.add(cur.toString()); cur.setLength(0); continue; }
             cur.append(ch);
             if (p.measureText(cur.toString()) > maxW && cur.length() > 1) {
-                cur.setLength(cur.length() - 1);
-                out.add(cur.toString());
+                // 往回退到单词边界，避免把 "GitHub" 劈成 "G" + "itHub"
+                int cut = cur.length() - 1;
+                if (wordChar(ch)) {
+                    int k = cut;
+                    while (k > 1 && wordChar(cur.charAt(k - 1))) k--;
+                    if (k > 1) cut = k;
+                }
+                String keep = cur.substring(cut);
+                out.add(cur.substring(0, cut));
                 cur.setLength(0);
-                cur.append(ch);
+                cur.append(keep);
             }
         }
         out.add(cur.toString());

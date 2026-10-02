@@ -18,7 +18,7 @@ namespace StudyCompanion
         static void Main(string[] args)
         {
             bool selftest = false, testtoast = false, tray = false, layoutTest = false, closeTest = false;
-            string shot = null, shotDate = null;
+            string shot = null, shotDate = null, mdFile = null;
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -29,6 +29,7 @@ namespace StudyCompanion
                 else if (a == "--closetest") closeTest = true;
                 else if (a == "--shot" && i + 1 < args.Length) shot = args[i + 1];
                 else if (a == "--date" && i + 1 < args.Length) shotDate = args[i + 1];
+                else if (a == "--md" && i + 1 < args.Length) mdFile = args[i + 1];
             }
 
             try { SetProcessDPIAware(); } catch { }
@@ -49,7 +50,7 @@ namespace StudyCompanion
 
             if (layoutTest) { LayoutTest(); return; }
 
-            if (shot != null) { Snapshot(shot, shotDate); return; }
+            if (shot != null) { Snapshot(shot, shotDate, mdFile); return; }
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -75,12 +76,18 @@ namespace StudyCompanion
                     return;
                 }
 
+                // 自动检查更新必须在这里起 —— 开机自启是 --tray，
+                // 只建托盘图标、不建主窗口，放在 MainForm 里就永远不会执行
+                var marshal = new Form();
+                var h = marshal.Handle;          // 逼出句柄但不显示，只用来切回 UI 线程
+                Updater.Start(marshal);
+
                 Application.Run(new TrayApp(tray));
             }
         }
 
         // ------------------------------------------------------------------ 离屏截图（自检用，不显示窗口）
-        static void Snapshot(string path, string dateArg)
+        static void Snapshot(string path, string dateArg, string mdFile)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -107,12 +114,24 @@ namespace StudyCompanion
 
             if (Path.GetFileName(path).ToLower().Contains("doc"))
             {
-                // 先同步拉一次，这样截图内容是确定的，也顺便验证了自动更新这条链路
-                string err;
-                bool ok = Changelog.Fetch(out err);
-                string md = Changelog.Local();
+                // 有 --md 就直接渲染指定文件（用来单独测 Markdown 渲染，不联网）
+                // 否则先同步拉一次，这样截图内容是确定的，也顺便验证了自动更新这条链路
+                string err = "";
+                bool ok;
+                string md;
+                if (!string.IsNullOrEmpty(mdFile) && File.Exists(mdFile))
+                {
+                    md = File.ReadAllText(mdFile, Encoding.UTF8);
+                    ok = true;
+                    err = "(用了 --md)";
+                }
+                else
+                {
+                    ok = Changelog.Fetch(out err);
+                    md = Changelog.Local();
+                }
                 if (string.IsNullOrEmpty(md)) md = "（没有找到更新日志）";
-                var v = new DocViewer("更新日志 · StudyCompanion", md);
+                var v = new DocViewer("更新日志 · StudyCompanion", md, string.IsNullOrEmpty(mdFile));
                 v.ShowInTaskbar = false;
                 v.StartPosition = FormStartPosition.Manual;
                 v.Location = new Point(-4000, -4000);
