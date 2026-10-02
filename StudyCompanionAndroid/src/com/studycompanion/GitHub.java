@@ -14,6 +14,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
 
 /**
  * GitHub 集成：设备码登录 + REST API。
@@ -32,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.0.1";
+    public static final String VERSION_TAG = "v2.0.2";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -72,6 +74,7 @@ public class GitHub {
         conn.setReadTimeout(TIMEOUT);
         conn.setRequestProperty("Accept", accept);
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
+        applyTls(conn);
         if (token != null && token.length() > 0)
             conn.setRequestProperty("Authorization", "Bearer " + token);
         if (body != null) {
@@ -131,6 +134,7 @@ public class GitHub {
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
+        applyTls(conn);
         OutputStream os = conn.getOutputStream();
         os.write(body.getBytes("UTF-8"));
         os.close();
@@ -190,6 +194,7 @@ public class GitHub {
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
+        applyTls(conn);
         OutputStream os = conn.getOutputStream();
         os.write(body.getBytes("UTF-8"));
         os.close();
@@ -205,6 +210,27 @@ public class GitHub {
 
     static void sleep(long ms) {
         try { Thread.sleep(ms); } catch (InterruptedException ignored) { }
+    }
+
+    // ------------------------------------------------------------------ TLS
+    // Android 5.0+ 默认就启用 TLS1.2，但少数老机型/定制 ROM 会把它关掉，
+    // GitHub 只接受 TLS1.2+，所以这里显式指定一次（拿不到就退回系统默认）。
+    private static javax.net.ssl.SSLSocketFactory TLS12;
+    private static boolean TLS_TRIED;
+
+    static void applyTls(HttpURLConnection conn) {
+        if (!(conn instanceof HttpsURLConnection)) return;
+        if (!TLS_TRIED) {
+            TLS_TRIED = true;
+            try {
+                SSLContext c = SSLContext.getInstance("TLSv1.2");
+                c.init(null, null, null);
+                TLS12 = c.getSocketFactory();
+            } catch (Exception e) { TLS12 = null; }
+        }
+        if (TLS12 != null) {
+            try { ((HttpsURLConnection) conn).setSSLSocketFactory(TLS12); } catch (Exception ignored) { }
+        }
     }
 
     // ================================================================== API
@@ -298,6 +324,7 @@ public class GitHub {
         conn.setRequestProperty("Accept", "application/octet-stream");
         conn.setRequestProperty("Authorization", "Bearer " + token(c));
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
+        applyTls(conn);
         int code = conn.getResponseCode();
         if (code == 302 || code == 301) {
             String loc = conn.getHeaderField("Location");
@@ -306,6 +333,7 @@ public class GitHub {
             conn.setConnectTimeout(TIMEOUT);
             conn.setReadTimeout(60000);
             conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
+            applyTls(conn);
             code = conn.getResponseCode();
         }
         if (code < 200 || code >= 300) throw new Exception("下载失败 HTTP " + code);

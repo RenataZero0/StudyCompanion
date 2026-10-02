@@ -32,6 +32,10 @@ namespace StudyCompanion
             }
 
             try { SetProcessDPIAware(); } catch { }
+
+            // 必须早于任何网络请求：打开 TLS1.2，否则连 GitHub 会报「未能创建 SSL/TLS 安全通道」
+            try { GitHub.Init(); } catch { }
+
             try
             {
                 using (var g = Graphics.FromHwnd(IntPtr.Zero))

@@ -16,6 +16,31 @@ namespace StudyCompanion
     /// </summary>
     public static class GitHub
     {
+        // ============================================================== TLS
+        // csc.exe 编译出来的程序，运行时默认被当成旧版 .NET 应用，
+        // SecurityProtocol 只开了 SSL3 + TLS1.0，而 GitHub 只接受 TLS1.2+，
+        // 于是连接会失败并报「未能创建 SSL/TLS 安全通道」。
+        // 这里在类型第一次被使用时显式打开 TLS1.2 / TLS1.3。
+        static GitHub()
+        {
+            try
+            {
+                // 只开 TLS1.2。用「赋值」而不是 |=，
+                // 否则默认的 Ssl3/Tls1.0 会留在列表里，反而容易握手失败。
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 程序启动时调用一次。
+        ///
+        /// 注意：ClientId / VersionTag 是 const，编译器会把它们的取值**内联**，
+        /// 访问它们**不会**触发静态构造函数。所以必须在发任何网络请求之前，
+        /// 显式调用这个方法来确保 TLS 设置已经生效。
+        /// </summary>
+        public static void Init() { }
+
         /// <summary>OAuth App 的 Client ID（设备码流程不需要 client_secret）</summary>
         public const string ClientId = "Ov23limNvMWKQQ3qKGD1";
 
@@ -24,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.0.1";
+        public const string VersionTag = "v2.0.2";
 
         public const string SyncPath = "sync/progress.txt";
 
