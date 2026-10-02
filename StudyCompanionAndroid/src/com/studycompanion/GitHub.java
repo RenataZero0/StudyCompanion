@@ -34,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 鏈?APK 瀵瑰簲鐨?Release 鏍囩銆傛瘡娆″彂鐗堟椂涓?Release 涓€璧锋敼锛岀敤浜庡垽鏂湁娌℃湁鏂扮増銆?*/
-    public static final String VERSION_TAG = "v2.1.6";
+    public static final String VERSION_TAG = "v2.1.7";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";

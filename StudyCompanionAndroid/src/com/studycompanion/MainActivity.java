@@ -136,17 +136,26 @@ public class MainActivity extends Activity implements MainView.Listener {
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT, h));
         }
 
-        new AlertDialog.Builder(this)
+        AlertDialog dlg = new AlertDialog.Builder(this)
                 .setTitle("发现新版本 " + rel.tag)
                 .setView(box)
                 .setPositiveButton("下载并安装", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dlg, int w) { downloadApk(rel); }
+                    public void onClick(DialogInterface d2, int w) { downloadApk(rel); }
                 })
                 .setNeutralButton("Release 页", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dlg, int w) { openUrl(rel.pageUrl); }
+                    public void onClick(DialogInterface d2, int w) { openUrl(rel.pageUrl); }
                 })
                 .setNegativeButton("以后再说", null)
-                .show();
+                .create();
+        dlg.show();
+
+        // Material 主题默认把对话框按钮文字转成全大写（"Release 页" -> "RELEASE 页"），关掉
+        android.widget.Button b1 = dlg.getButton(AlertDialog.BUTTON_POSITIVE);
+        android.widget.Button b2 = dlg.getButton(AlertDialog.BUTTON_NEUTRAL);
+        android.widget.Button b3 = dlg.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (b1 != null) b1.setAllCaps(false);
+        if (b2 != null) b2.setAllCaps(false);
+        if (b3 != null) b3.setAllCaps(false);
     }
 
     /** 上次崩溃过就把堆栈弹出来 —— 手机上没法看 logcat，这是唯一能拿到线索的办法 */
