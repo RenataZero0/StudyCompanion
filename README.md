@@ -10,10 +10,20 @@
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
-| **Windows** | [`StudyCompanion.exe`](../../releases/latest/download/StudyCompanion.exe) | 免安装，双击即用（.NET Framework 4.x，Windows 自带） |
-| **Android** | [`StudyCompanion.apk`](../../releases/latest/download/StudyCompanion.apk) | minSdk 21，已签名，直接安装 |
+| **Windows** | **[⬇ StudyCompanion.exe](https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.exe)** | 免安装，双击即用（.NET Framework 4.x，Windows 自带） |
+| **Android** | **[⬇ StudyCompanion.apk](https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.apk)** | Android 5.0+，已签名，直接安装 |
 
-> 打不开上面的链接？到仓库的 **Releases** 页面手动下载即可。
+上面是**永久直链**，永远指向最新版，可以收藏或分享。
+
+也可以到 [**Releases 页面**](https://github.com/RenataZero0/StudyCompanion/releases/latest) 手动下载，或查看历史版本。
+
+> **离线取用**：如果只想拿文件、不需要看源码，直接下这两个就行：
+> ```
+> https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.exe
+> https://github.com/RenataZero0/StudyCompanion/releases/latest/download/StudyCompanion.apk
+> ```
+>
+> 国内访问 GitHub 较慢时，可以在浏览器里用代理，或把链接发到手机再下。
 
 ---
 

@@ -37,3 +37,7 @@ desktop.ini
 # 自检产物
 _plan/checks.json
 
+
+# 发布说明草稿（内容已发布到 Release 页）
+_release_notes.md
+
