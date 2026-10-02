@@ -40,7 +40,8 @@ public class MainView extends View {
 
     static final int A_URL = 1, A_TOGGLE = 2, A_DAY = 3, A_MENU = 4, A_EXPORT = 5,
             A_IMPORT = 6, A_LOG = 7, A_TODAY = 8, A_CLOSE_MENU = 9, A_REMIND = 10,
-            A_GH_LOGIN = 11, A_GH_LOGOUT = 12, A_GH_SYNC = 13, A_GH_UPDATE = 14;
+            A_GH_LOGIN = 11, A_GH_LOGOUT = 12, A_GH_SYNC = 13, A_GH_UPDATE = 14,
+            A_OV_CAL = 21, A_OV_STATS = 22, A_OV_TOOLS = 23, A_OV_CLOSE = 24;
 
     private final Listener listener;
     private final List<Hit> hits = new ArrayList<Hit>();
@@ -57,6 +58,13 @@ public class MainView extends View {
     private boolean dragging;
     private final int slop;
 
+    // ---- 手机端：日历 / 统计 / 设置 放独立页面，不占主界面 ----
+    int overlay = 0;                 // 0=主界面 1=日历 2=统计 3=设置
+    float ovScroll = 0, ovContentH = 0;
+    float bottomH = 0;               // 底部按钮栏高度（仅手机端）
+    private float ovDownY, ovDownScroll;
+    private boolean ovDragging;
+
     public MainView(Context ctx, Listener l) {
         super(ctx);
         listener = l;
@@ -68,6 +76,7 @@ public class MainView extends View {
     // ================================================================== 触摸
     @Override
     public boolean onTouchEvent(MotionEvent e) {
+        if (overlay != 0) return overlayTouch(e);
         float x = e.getX(), y = e.getY();
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
@@ -91,7 +100,11 @@ public class MainView extends View {
                     vt.computeCurrentVelocity(1000);
                     int vy = (int) vt.getYVelocity();
                     if (dragging && Math.abs(vy) > 200) {
-                        scroller.fling(0, (int) scrollY, 0, vy, 0, 0, 0, (int) maxScroll());
+                        // 注意符号：getYVelocity() 是「手指」的速度，
+                        // 往上滑手指 y 减小 -> vy 为负；而 fling 要的是「滚动坐标」的速度，
+                        // 往上滑应该是 scrollY 增大，所以要取反。
+                        // 之前没取反，每次滑完都往反方向弹回去 —— 就是那个「回滚」现象。
+                        scroller.fling(0, (int) scrollY, 0, -vy, 0, 0, 0, (int) maxScroll());
                         invalidate();
                     }
                 }
@@ -108,20 +121,83 @@ public class MainView extends View {
     @Override
     public void computeScroll() {
         if (scroller.computeScrollOffset()) {
-            scrollY = scroller.getCurrY();
-            clampScroll();
+            if (overlay != 0) { ovScroll = scroller.getCurrY(); clampOv(); }
+            else { scrollY = scroller.getCurrY(); clampScroll(); }
             invalidate();
         }
     }
 
     private float maxScroll() {
-        return Math.max(0, contentH - (getHeight() - headerH));
+        // 手机端要减去底部按钮栏的高度
+        return Math.max(0, contentH - (getHeight() - headerH - bottomH));
     }
 
     private void clampScroll() {
         float m = maxScroll();
         if (scrollY < 0) scrollY = 0;
         if (scrollY > m) scrollY = m;
+    }
+
+    private float maxOv() {
+        return Math.max(0, ovContentH - (getHeight() - Ui.px(56)));
+    }
+
+    private void clampOv() {
+        float m = maxOv();
+        if (ovScroll < 0) ovScroll = 0;
+        if (ovScroll > m) ovScroll = m;
+    }
+
+    /** 供 Activity 的返回键调用：关掉独立页面 */
+    public boolean closeOverlay() {
+        if (overlay == 0) return false;
+        overlay = 0; ovScroll = 0;
+        invalidate();
+        return true;
+    }
+
+    // ------------------------------------------------ 独立页面（日历 / 统计 / 设置）
+    private boolean overlayTouch(MotionEvent e) {
+        float x = e.getX(), y = e.getY();
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                ovDownY = y; ovDownScroll = ovScroll; ovDragging = false;
+                if (vt == null) vt = VelocityTracker.obtain(); else vt.clear();
+                vt.addMovement(e);
+                scroller.forceFinished(true);
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if (vt != null) vt.addMovement(e);
+                if (Math.abs(y - ovDownY) > slop) ovDragging = true;
+                if (ovDragging) {
+                    ovScroll = ovDownScroll - (y - ovDownY);
+                    clampOv();
+                    invalidate();
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+                if (vt != null) {
+                    vt.addMovement(e);
+                    vt.computeCurrentVelocity(1000);
+                    int vy = (int) vt.getYVelocity();
+                    if (ovDragging && Math.abs(vy) > 200) {
+                        scroller.fling(0, (int) ovScroll, 0, -vy, 0, 0, 0, (int) maxOv());
+                        invalidate();
+                    }
+                }
+                if (!ovDragging) {
+                    for (int i = hits.size() - 1; i >= 0; i--) {
+                        Hit h = hits.get(i);
+                        if (h.r.contains(x, y)) { dispatch(h); return true; }
+                    }
+                }
+                ovDragging = false;
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                ovDragging = false;
+                return true;
+        }
+        return true;
     }
 
     private void handleTap(float x, float y) {
@@ -192,6 +268,14 @@ public class MainView extends View {
             case A_GH_UPDATE:
                 if (listener != null) listener.ghCheckUpdate();
                 break;
+            case A_OV_CAL:
+                overlay = 1; ovScroll = 0; break;
+            case A_OV_STATS:
+                overlay = 2; ovScroll = 0; break;
+            case A_OV_TOOLS:
+                overlay = 3; ovScroll = 0; break;
+            case A_OV_CLOSE:
+                overlay = 0; ovScroll = 0; break;
         }
         invalidate();
     }
@@ -225,19 +309,20 @@ public class MainView extends View {
         // 平板 / 横屏：左右两栏（与桌面版一致）；手机竖屏：单栏
         boolean twoCol = total >= Ui.px(720);
 
+        // 手机端：日历 / 统计 / 设置 挪到独立页面，主界面只留今天的任务
+        if (overlay != 0) { drawOverlay(c, W, H); return; }
+        bottomH = twoCol ? 0 : Ui.px(54);
+
         float bodyTop = headerH;
         c.save();
-        c.clipRect(0, bodyTop, W, H);
+        c.clipRect(0, bodyTop, W, H - bottomH);
         hitOffset = bodyTop - scrollY;
         c.translate(0, hitOffset);
 
         if (!twoCol) {
             float y = Ui.px(14);
             y = drawCards(c, boxX0, total, y);
-            y = drawCalendar(c, boxX0, total, y + Ui.px(4));
-            y = drawStats(c, boxX0, total, y + Ui.px(4));
-            y = drawTools(c, boxX0, total, y + Ui.px(4));
-            contentH = y + Ui.px(30);
+            contentH = y + Ui.px(20);
         } else {
             float leftW = Math.round((total - gap) * 0.60f);
             float rightW = total - gap - leftW;
@@ -252,8 +337,59 @@ public class MainView extends View {
 
         clampScroll();
         drawHeader(c, W);
+        if (!twoCol) drawBottomBar(c, W, H);
 
         if (menuOwner >= 0) drawMenu(c, W, H);
+    }
+
+    // ---------------------------------------------------------------- 手机端底部按钮栏
+    private void drawBottomBar(Canvas c, float W, float H) {
+        // 底部栏画在屏幕坐标系里，不跟随内容滚动 ——
+        // 命中矩形不能再叠加内容偏移，否则按钮会被挪到屏幕外，怎么点都没反应
+        hitOffset = 0;
+        float top = H - bottomH;
+        Ui.roundRect(c, 0, top, W, H, 0, 0xFFFFFFFF);
+        Ui.roundRect(c, 0, top, W, top + 1, 0, Ui.LINE);
+        String[] labels = {"月历", "学习统计", "设置与工具"};
+        int[] actions = {A_OV_CAL, A_OV_STATS, A_OV_TOOLS};
+        float bw = W / 3f;
+        for (int i = 0; i < 3; i++) {
+            RectF r = new RectF(i * bw, top, (i + 1) * bw, H);
+            Ui.textC(c, labels[i], r, Ui.font(13, true, Ui.ACCENT));
+            hit(r, actions[i], null, 0);
+        }
+    }
+
+    // ---------------------------------------------------------------- 独立页面
+    private void drawOverlay(Canvas c, float W, float H) {
+        c.drawColor(Ui.BG);
+        float barH = Ui.px(56);
+        float pad = Ui.px(14);
+        float w = W - pad * 2;
+
+        c.save();
+        c.clipRect(0, barH, W, H);
+        hitOffset = barH - ovScroll;
+        c.translate(0, hitOffset);
+        float y = Ui.px(14);
+        if (overlay == 1) y = drawCalendar(c, pad, w, y);
+        else if (overlay == 2) y = drawStats(c, pad, w, y);
+        else y = drawTools(c, pad, w, y);
+        ovContentH = y + Ui.px(30);
+        c.restore();
+
+        clampOv();
+
+        // 顶栏
+        Ui.roundRect(c, 0, 0, W, barH, 0, 0xFFFFFFFF);
+        String title = overlay == 1 ? "月历" : overlay == 2 ? "学习统计" : "设置与工具";
+        Ui.text(c, title, Ui.px(20), Ui.px(36), Ui.font(17, true, Ui.INK));
+        RectF close = new RectF(W - Ui.px(16) - Ui.px(78), Ui.px(13), W - Ui.px(16), Ui.px(43));
+        Ui.roundRect(c, close, Ui.px(15), Ui.ACCENT);
+        Ui.textC(c, "关闭", close, Ui.font(13, true, 0xFFFFFFFF));
+        hitOffset = 0;
+        hit(close, A_OV_CLOSE, null, 0);
+        Ui.roundRect(c, 0, barH - Ui.px(1), W, barH, 0, Ui.LINE);
     }
 
     // ---------------------------------------------------------------- 顶部
@@ -555,7 +691,8 @@ public class MainView extends View {
     /** 工具区的分组：[标题, 按钮..., 以 \u0001 开头的说明行(可选)] */
     private List<String[]> toolGroups() {
         List<String[]> gs = new ArrayList<String[]>();
-        gs.add(new String[]{"学习记录", "导出记录 CSV", "导入记录 CSV"});
+        // 「导出/导入 CSV」已去掉 —— 打卡记录和 CSV 都会在同步时自动传到 GitHub，
+        // 想要表格直接去仓库下载 sync/StudyRecord.csv
         gs.add(new String[]{"其他", "查看更新日志", "回到今天"});
         gs.add(new String[]{"提醒", Store.autoRemind() ? "到点提醒：已开启" : "到点提醒：已关闭"});
 
@@ -566,7 +703,7 @@ public class MainView extends View {
                     "\u0001还没填 OAuth App 的 Client ID，需要重新编译"});
         } else if (!in) {
             gs.add(new String[]{"GitHub 同步", "登录 GitHub",
-                    "\u0001登录后可同步打卡记录、检查更新"});
+                    "\u0001登录后会自动同步打卡记录，并把 CSV 传到云端"});
         } else {
             gs.add(new String[]{"GitHub 同步", "立即同步", "检查更新", "退出登录",
                     "\u0001已登录：" + GitHub.user(getContext())});
@@ -614,26 +751,26 @@ public class MainView extends View {
         for (String[] g : groups) {
             Ui.text(c, g[0], pad + Ui.px(16), cy + Ui.px(14), pLabel);
             cy += Ui.px(22);
+
+            // 先把按钮全部排完（会自动换行），再画说明行。
+            // 之前是在同一个循环里边排按钮边画说明，说明行用的还是按钮那一行的 cy，
+            // 结果说明文字直接压在按钮上。
             float bx = pad + Ui.px(16);
+            float rowTop = cy;
             for (int i = 1; i < g.length; i++) {
                 String label = g[i];
-                if (label.startsWith("\u0001")) {
-                    Ui.text(c, label.substring(1), pad + Ui.px(16), cy + Ui.px(13), pNote);
-                    cy += Ui.px(18);
-                    continue;
-                }
+                if (label.startsWith("\u0001")) continue;
                 boolean primary = "提醒".equals(g[0]) || "登录 GitHub".equals(label);
                 Paint pBtn = Ui.font(12, true, primary ? 0xFFFFFFFF : Ui.SUB);
                 float bw = Math.max(Ui.px(104), pBtn.measureText(label) + Ui.px(24));
-                if (bx + bw > pad + w - Ui.px(16) && bx > pad + Ui.px(16)) { bx = pad + Ui.px(16); cy += Ui.px(38); }
-                RectF r = new RectF(bx, cy, bx + bw, cy + Ui.px(30));
+                if (bx + bw > pad + w - Ui.px(16) && bx > pad + Ui.px(16)) { bx = pad + Ui.px(16); rowTop += Ui.px(38); }
+                RectF r = new RectF(bx, rowTop, bx + bw, rowTop + Ui.px(30));
                 Ui.roundRect(c, r, Ui.px(15), primary ? Ui.ACCENT : 0xFFFFFFFF);
                 Ui.roundStroke(c, r, Ui.px(15), primary ? Ui.ACCENT : Ui.LINE, 1f);
                 Ui.textC(c, label, r, pBtn);
 
-                int action = A_EXPORT;
-                if ("导入记录 CSV".equals(label)) action = A_IMPORT;
-                else if ("查看更新日志".equals(label)) action = A_LOG;
+                int action = A_LOG;
+                if ("查看更新日志".equals(label)) action = A_LOG;
                 else if ("回到今天".equals(label)) action = A_TODAY;
                 else if (label.startsWith("到点提醒")) action = A_REMIND;
                 else if (label.startsWith("登录 GitHub")) action = A_GH_LOGIN;
@@ -643,7 +780,15 @@ public class MainView extends View {
                 hit(r, action, null, 0);
                 bx += bw + Ui.px(8);
             }
-            cy += Ui.px(30) + Ui.px(10);
+            cy = rowTop + Ui.px(30);
+
+            for (int i = 1; i < g.length; i++) {
+                String label = g[i];
+                if (!label.startsWith("\u0001")) continue;
+                Ui.text(c, label.substring(1), pad + Ui.px(16), cy + Ui.px(13), pNote);
+                cy += Ui.px(18);
+            }
+            cy += Ui.px(10);
         }
         return y + h;
     }

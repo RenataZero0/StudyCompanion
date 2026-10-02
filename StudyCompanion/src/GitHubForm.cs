@@ -261,7 +261,8 @@ namespace StudyCompanion
                     {
                         SetBusy(false);
                         SetLog("同步完成　从云端新增 " + r.Pulled + " 条　合计 " + r.Total + " 条\n"
-                             + (r.Uploaded ? "已把本地记录上传到仓库。" : "云端已是最新，无需上传。"));
+                             + (r.Uploaded ? "已把本地记录上传到仓库。" : "云端已是最新，无需上传。")
+                             + "\nCSV：" + (r.CsvUploaded ? "已更新 sync/StudyRecord.csv" : "云端已是最新"));
                         MainForm.NotifyDataChanged();
                     });
                 }

@@ -20,6 +20,8 @@ public class Sync {
         public int pulled = 0;      // 从云端拉下来的新记录
         public int total = 0;       // 合并后总数
         public boolean uploaded = false;
+        public boolean csvUploaded = false;
+        public String csvPath = "";
         public String time = "";
     }
 
@@ -58,6 +60,21 @@ public class Sync {
         if (!remote.equals(merged)) {
             GitHub.writeFile(c, GitHub.SYNC_PATH, dump(merged), "同步学习记录");
             r.uploaded = true;
+        }
+
+        // 顺便把 CSV 也传到云端 —— 这样设置里就不需要「导出 CSV」按钮了，
+        // 想要表格直接去仓库下载 sync/StudyRecord.csv
+        try {
+            String csv = Store.exportCsv();
+            String remoteCsv = GitHub.readFile(c, GitHub.CSV_PATH);
+            if (remoteCsv == null || !remoteCsv.equals(csv)) {
+                GitHub.writeFile(c, GitHub.CSV_PATH, csv, "同步学习记录 CSV");
+                r.csvUploaded = true;
+            }
+            r.csvPath = GitHub.CSV_PATH;
+        } catch (Exception e) {
+            // CSV 传失败不影响打卡记录同步
+            r.csvPath = "";
         }
         r.time = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
                 .format(new java.util.Date());

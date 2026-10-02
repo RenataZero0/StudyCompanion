@@ -49,9 +49,11 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.0.4";
+        public const string VersionTag = "v2.0.5";
 
         public const string SyncPath = "sync/progress.txt";
+        /// <summary>打卡记录的 CSV 也会自动传到这里，不用手动导出</summary>
+        public const string CsvPath = "sync/StudyRecord.csv";
 
         const string DeviceCodeUrl = "https://github.com/login/device/code";
         const string TokenUrl = "https://github.com/login/oauth/access_token";
@@ -392,6 +394,7 @@ namespace StudyCompanion
         {
             public int Pulled, Total;
             public bool Uploaded;
+            public bool CsvUploaded;
         }
 
         public static SyncResult Sync()
@@ -409,6 +412,23 @@ namespace StudyCompanion
             {
                 WriteFile(SyncPath, DumpKeys(merged), "同步学习记录");
                 res.Uploaded = true;
+            }
+
+            // 顺便把 CSV 也传到云端 —— 这样设置里就不需要「导出 / 导入 CSV」按钮了，
+            // 想要表格直接去仓库拿 sync/StudyRecord.csv
+            try
+            {
+                string csv = Store.ExportCsv();
+                string remoteCsv = ReadFile(CsvPath);
+                if (remoteCsv == null || remoteCsv != csv)
+                {
+                    WriteFile(CsvPath, csv, "同步学习记录 CSV");
+                    res.CsvUploaded = true;
+                }
+            }
+            catch
+            {
+                // CSV 传失败不影响打卡记录同步
             }
             return res;
         }

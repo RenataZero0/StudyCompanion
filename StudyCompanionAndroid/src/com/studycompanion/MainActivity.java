@@ -41,6 +41,8 @@ public class MainActivity extends Activity implements MainView.Listener {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        // 尽早装上：这样后面任何地方抛异常都会留下堆栈，而不是只看到一个「闪退」
+        CrashHandler.install(this);
         Ui.S = getResources().getDisplayMetrics().density;
         ScheduleData.load(this);
         Store.init(this);
@@ -54,6 +56,59 @@ public class MainActivity extends Activity implements MainView.Listener {
 
         requestNotifPermission();
         if (Store.autoRemind()) Reminder.scheduleAll(this);
+
+        showLastCrash();
+    }
+
+    /** 上次崩溃过就把堆栈弹出来 —— 手机上没法看 logcat，这是唯一能拿到线索的办法 */
+    private void showLastCrash()
+    {
+        final String log = CrashHandler.last(this);
+        if (log == null) return;
+        String shown = log.length() > 1600 ? log.substring(0, 1600) + "\n…（完整内容已存成文件）" : log;
+        new AlertDialog.Builder(this)
+                .setTitle("上次运行时崩溃了")
+                .setMessage(shown
+                        + "\n\n完整日志在：\n" + CrashHandler.file(this).getAbsolutePath())
+                .setPositiveButton("复制", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        copyCrash(log);
+                    }
+                })
+                .setNeutralButton("分享", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        shareCrash(log);
+                    }
+                })
+                .setNegativeButton("知道了", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        CrashHandler.clear(MainActivity.this);
+                    }
+                })
+                .show();
+    }
+
+    private void copyCrash(String log)
+    {
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", log));
+            toast("崩溃日志已复制");
+        } catch (Exception e) { toast("复制失败：" + e); }
+        CrashHandler.clear(this);
+    }
+
+    private void shareCrash(String log)
+    {
+        try {
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType("text/plain");
+            i.putExtra(Intent.EXTRA_SUBJECT, "StudyCompanion 崩溃日志");
+            i.putExtra(Intent.EXTRA_TEXT, log);
+            startActivity(Intent.createChooser(i, "发送崩溃日志"));
+        } catch (Exception e) { copyCrash(log); return; }
+        CrashHandler.clear(this);
     }
 
     private void requestNotifPermission() {
@@ -66,6 +121,13 @@ public class MainActivity extends Activity implements MainView.Listener {
     protected void onResume() {
         super.onResume();
         if (view != null) view.invalidate();
+    }
+
+    /** 独立页面（月历/统计/设置）打开时，返回键先关它，而不是直接退出应用 */
+    @Override
+    public void onBackPressed() {
+        if (view != null && view.closeOverlay()) return;
+        super.onBackPressed();
     }
 
     // ================================================================== CSV

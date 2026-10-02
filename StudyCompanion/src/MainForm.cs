@@ -580,15 +580,8 @@ namespace StudyCompanion
             _rightFlow.Controls.Add(_stats);
             _rightFlow.Controls.Add(_tools);
 
-            // 工具按钮（分三组，界面更清爽）
-            _tools.AddGroup("学习记录");
-            _tools.AddButton("导出记录 CSV", delegate
-            {
-                try { string p = Store.ExportCsv(); MessageBox.Show(this, "已导出：\n" + p, "导出成功"); }
-                catch (Exception ex) { MessageBox.Show(this, "导出失败：" + ex.Message, "提示"); }
-            }, false);
-            _tools.AddButton("导入记录 CSV", delegate { ImportCsv(); }, false);
-
+            // 「导出 / 导入 CSV」按钮已去掉 —— 打卡记录和 CSV 都会在同步时自动传到 GitHub，
+            // 想要表格直接去仓库下载 sync/StudyRecord.csv
             _tools.AddGroup("其他");
             _tools.AddButton("查看更新日志", delegate { ShowChangelog(); }, false);
             _tools.AddButton("回到今天", delegate { GoToday(); }, false);

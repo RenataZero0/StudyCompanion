@@ -34,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.0.4";
+    public static final String VERSION_TAG = "v2.0.5";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -42,6 +42,8 @@ public class GitHub {
     public static final String VERIFY_URL = "https://github.com/login/device";
 
     public static final String SYNC_PATH = "sync/progress.txt";
+    /** 打卡记录的 CSV 也会自动传到这里，不用在手机上手动导出 */
+    public static final String CSV_PATH = "sync/StudyRecord.csv";
 
     private static final int TIMEOUT = 20000;
 
