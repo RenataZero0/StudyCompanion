@@ -2,7 +2,9 @@
 
 和桌面版 `StudyCompanion` 功能一致、界面同一套设计语言的安卓应用。
 
-**成品：`StudyCompanion.apk`（约 130 KB，minSdk 21 / targetSdk 34，已签名，可直接安装）**
+**成品：`StudyCompanion.apk`（约 145 KB，minSdk 21 / targetSdk 34，已签名，可直接安装）**
+
+> **v2.0.1 起已内置 OAuth Client ID** —— 装好后「GitHub 同步 → 登录 GitHub」直接可用，无需任何配置。
 
 ---
 

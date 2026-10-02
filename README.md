@@ -12,7 +12,8 @@
 > [Releases 页面](https://github.com/RenataZero0/StudyCompanion/releases/latest) 手动下载。
 >
 > 装好之后，程序内置了 **GitHub 登录**，可以自己检查更新、直接下载新版本，
-> 还能把手机和电脑的打卡记录互相同步。配置方法见 **[GITHUB_SETUP.md](GITHUB_SETUP.md)**。
+> 还能把手机和电脑的打卡记录互相同步。
+> **v2.0.1 起 Client ID 已内置，下载后直接用，无需任何配置。**
 
 | 平台 | 文件 | 说明 |
 |---|---|---|

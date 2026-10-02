@@ -16,15 +16,15 @@ namespace StudyCompanion
     /// </summary>
     public static class GitHub
     {
-        /// <summary>← 注册 OAuth App 后把 Client ID 填到这里（与 Android 版用同一个即可）</summary>
-        public const string ClientId = "PUT_YOUR_CLIENT_ID_HERE";
+        /// <summary>OAuth App 的 Client ID（设备码流程不需要 client_secret）</summary>
+        public const string ClientId = "Ov23limNvMWKQQ3qKGD1";
 
         public const string Owner = "RenataZero0";
         public const string Repo = "StudyCompanion";
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.0";
+        public const string VersionTag = "v2.0.1";
 
         public const string SyncPath = "sync/progress.txt";
 

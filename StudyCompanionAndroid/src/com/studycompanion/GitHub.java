@@ -23,8 +23,8 @@ import java.net.URLEncoder;
  */
 public class GitHub {
 
-    /** ← 注册 OAuth App 后把 Client ID 填到这里 */
-    public static final String CLIENT_ID = "PUT_YOUR_CLIENT_ID_HERE";
+    /** OAuth App 的 Client ID（设备码流程不需要 client_secret） */
+    public static final String CLIENT_ID = "Ov23limNvMWKQQ3qKGD1";
 
     public static final String OWNER = "RenataZero0";
     public static final String REPO = "StudyCompanion";
@@ -32,7 +32,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.0";
+    public static final String VERSION_TAG = "v2.0.1";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
