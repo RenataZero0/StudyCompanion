@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 /**
  * ⚠️ 本文件有两条必须遵守的约束（都是被 d8 逼出来的）：
@@ -242,6 +243,12 @@ public class MainActivity extends Activity implements MainView.Listener {
     public void openUrl(String url) {
         if (url == null || url.length() == 0) return;
 
+        // bilipick:<关键词> —— 去 B 站挑几个相关视频列出来
+        if (url.startsWith("bilipick:")) {
+            pickBiliVideo(url.substring("bilipick:".length()));
+            return;
+        }
+
         for (Intent candidate : appIntents(url)) {
             try {
                 candidate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -258,6 +265,211 @@ public class MainActivity extends Activity implements MainView.Listener {
         } catch (Exception e) {
             toast("打不开这个链接：" + url);
         }
+    }
+
+    // ================================================================== B 站挑视频
+    /**
+     * 去 B 站查一遍，按「跟 A Level / CIE 沾不沾边」打分排序，
+     * 把最好的几个列出来。查不到就退回搜索页。
+     */
+    private void pickBiliVideo(final String keyword) {
+        busy = new AlertDialog.Builder(this)
+                .setTitle("正在找视频…").setMessage(keyword)
+                .setCancelable(false).show();
+
+        new Thread(new Runnable() {
+            public void run() {
+                List<Bili.Video> list = null;
+                String err = null;
+                try {
+                    list = Bili.top(keyword, 6);
+                    if (list.isEmpty()) err = "没搜到";
+                } catch (Exception e) {
+                    err = String.valueOf(e.getMessage());
+                }
+                final List<Bili.Video> fl = list;
+                final String fe = err;
+                runOnUiThread(new Runnable() {
+                    public void run() { showBiliPicker(keyword, fl, fe); }
+                });
+            }
+        }).start();
+    }
+
+    private void showBiliPicker(final String keyword, final List<Bili.Video> list, String err) {
+        dismissBusy();
+
+        if (list == null || list.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("没找到合适的视频")
+                    .setMessage(err == null ? keyword : (keyword + "\n\n" + err))
+                    .setPositiveButton("在 B 站搜索", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface d, int w) { openBiliSearch(keyword); }
+                    })
+                    .setNegativeButton("取消", null)
+                    .show();
+            return;
+        }
+
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        float d = getResources().getDisplayMetrics().density;
+        box.setPadding((int) (14 * d), (int) (4 * d), (int) (14 * d), (int) (4 * d));
+        sv.addView(box);
+
+        for (int i = 0; i < list.size(); i++) {
+            box.addView(videoButton(list.get(i), i == 0));
+        }
+
+        // 限高：按钮再多也不把对话框撑出屏幕
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.55f);
+        box.measure(android.view.View.MeasureSpec.makeMeasureSpec(
+                        getResources().getDisplayMetrics().widthPixels - (int) (48 * d),
+                        android.view.View.MeasureSpec.AT_MOST),
+                android.view.View.MeasureSpec.UNSPECIFIED);
+        sv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.min(box.getMeasuredHeight(), maxH)));
+
+        new AlertDialog.Builder(this)
+                .setTitle("点一下直接播放")
+                .setView(sv)
+                .setNeutralButton("更多搜索", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) { openBiliSearch(keyword); }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /** 一个视频 = 一个圆角按钮：标题 + 说明 + 分P标记 */
+    private android.widget.TextView videoButton(final Bili.Video v, boolean top) {
+        float d = getResources().getDisplayMetrics().density;
+        android.widget.TextView tv = new android.widget.TextView(this);
+
+        String sub = v.subtitle();
+        if (v.videos > 1) sub = (sub.length() > 0 ? sub + " · " : "") + "共 " + v.videos + " 集";
+        tv.setText((top ? "★ 推荐  " : "") + v.title + "\n" + sub);
+        tv.setTextSize(14f);
+        tv.setTextColor(top ? 0xFF1B2432 : 0xFF3C4A60);
+        tv.setLineSpacing(0, 1.2f);
+        tv.setPadding((int) (14 * d), (int) (10 * d), (int) (14 * d), (int) (10 * d));
+        if (top) tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setColor(0xFFFFFFFF);
+        gd.setCornerRadius(12 * d);
+        gd.setStroke((int) (1 * d), top ? 0xFF3568E8 : 0xFFE5E9F0);
+        tv.setBackground(gd);
+
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = (int) (8 * d);
+        tv.setLayoutParams(lp);
+
+        tv.setOnClickListener(new android.view.View.OnClickListener() {
+            public void onClick(android.view.View w) {
+                if (v.videos > 1) pickPart(v);
+                else openBiliPart(v, 0);
+            }
+        });
+        return tv;
+    }
+
+    /** 多 P 视频：先读分 P 列表，再让用户点某一 P */
+    private void pickPart(final Bili.Video v) {
+        busy = new AlertDialog.Builder(this)
+                .setTitle("正在读取分 P…").setMessage(v.title)
+                .setCancelable(false).show();
+        new Thread(new Runnable() {
+            public void run() {
+                List<Bili.Part> parts = null;
+                String err = null;
+                try { parts = Bili.parts(v.bvid); } catch (Exception e) { err = String.valueOf(e.getMessage()); }
+                final List<Bili.Part> fp = parts;
+                final String fe = err;
+                runOnUiThread(new Runnable() {
+                    public void run() { showPartsDialog(v, fp, fe); }
+                });
+            }
+        }).start();
+    }
+
+    private void showPartsDialog(final Bili.Video v, List<Bili.Part> parts, String err) {
+        dismissBusy();
+        // 读不到分 P 就整个视频打开，别卡住用户
+        if (parts == null || parts.isEmpty()) { openBiliPart(v, 0); return; }
+
+        float d = getResources().getDisplayMetrics().density;
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding((int) (14 * d), (int) (4 * d), (int) (14 * d), (int) (4 * d));
+        sv.addView(box);
+
+        for (int i = 0; i < parts.size(); i++) {
+            final Bili.Part p = parts.get(i);
+            android.widget.TextView tv = new android.widget.TextView(this);
+            String label = p.part.length() > 0 ? p.part : ("第 " + p.page + " P");
+            String sub = "第 " + p.page + " P" + (p.duration.length() > 0 ? " · " + p.duration : "");
+            tv.setText(label + "\n" + sub);
+            tv.setTextSize(13.5f);
+            tv.setTextColor(0xFF3C4A60);
+            tv.setLineSpacing(0, 1.2f);
+            tv.setPadding((int) (14 * d), (int) (10 * d), (int) (14 * d), (int) (10 * d));
+
+            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+            gd.setColor(0xFFFFFFFF);
+            gd.setCornerRadius(12 * d);
+            gd.setStroke((int) (1 * d), 0xFFE5E9F0);
+            tv.setBackground(gd);
+
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = (int) (8 * d);
+            tv.setLayoutParams(lp);
+
+            tv.setOnClickListener(new android.view.View.OnClickListener() {
+                public void onClick(android.view.View w) { openBiliPart(v, p.page); }
+            });
+            box.addView(tv);
+        }
+
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.6f);
+        box.measure(android.view.View.MeasureSpec.makeMeasureSpec(
+                        getResources().getDisplayMetrics().widthPixels - (int) (48 * d),
+                        android.view.View.MeasureSpec.AT_MOST),
+                android.view.View.MeasureSpec.UNSPECIFIED);
+        sv.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.min(box.getMeasuredHeight(), maxH)));
+
+        new AlertDialog.Builder(this)
+                .setTitle("选择分 P")
+                .setView(sv)
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /** 打开某个视频（可选指定第几 P，page 从 1 开始；0 = 不分 P）。装了客户端就跳客户端。 */
+    private void openBiliPart(Bili.Video v, int page) {
+        if (installed(PKG_BILI)) {
+            try {
+                String uri = "bilibili://video/" + v.bvid + (page > 0 ? "?p=" + page : "");
+                Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+                i.setPackage(PKG_BILI);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return;
+            } catch (Exception ignored) { }
+        }
+        openUrl(v.page() + (page > 0 ? "?p=" + page : ""));
+    }
+
+    private void openBiliSearch(String keyword) {
+        openUrl("https://search.bilibili.com/all?keyword=" + Uri.encode(keyword));
     }
 
     /** 按优先级列出候选 Intent：先客户端，再网页 */

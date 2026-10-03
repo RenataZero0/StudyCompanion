@@ -301,8 +301,11 @@ public class Links {
         out.addAll(ls.res);
         if (ls.yt.length() > 0)
             out.add(R("▶ YouTube 搜索", "https://www.youtube.com/results?search_query=" + enc(ls.yt)));
-        if (ls.bl.length() > 0)
-            out.add(R("▶ Bilibili 搜索（免翻墙）", "https://search.bilibili.com/all?keyword=" + enc(ls.bl)));
+        if (ls.bl.length() > 0) {
+            // bilipick: 是给 MainActivity 看的自定义前缀 —— 点开后会去 B 站查一遍，
+            // 挑出最相关的几个视频直接列出来，而不是把用户丢进搜索结果页
+            out.add(R("▶ Bilibili 视频", "bilipick:" + ls.bl));
+        }
         return out;
     }
 

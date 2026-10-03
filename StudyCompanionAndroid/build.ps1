@@ -76,8 +76,15 @@ $gen  = @(Get-ChildItem "$out\gen" -Recurse -Filter *.java -ErrorAction Silently
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "[4/7] d8 (dex) ..."
-$classes = @(Get-ChildItem "$out\classes" -Recurse -Filter *.class | ForEach-Object { $_.FullName })
-& "$BT\d8.bat" --lib $AJAR --min-api 21 --output "$out\dex" @classes
+# Pack the classes into one jar first.
+# Listing every .class on the command line overflows the Windows command-line
+# limit, and D8 refuses a plain directory ("Unsupported source file type").
+$jar = "$out\classes.jar"
+if (Test-Path $jar) { Remove-Item $jar -Force }
+& "$JDK\bin\jar.exe" cf $jar -C "$out\classes" .
+if ($LASTEXITCODE -ne 0) { throw "jar failed" }
+
+& "$BT\d8.bat" --lib $AJAR --min-api 21 --output "$out\dex" $jar
 if ($LASTEXITCODE -ne 0) { throw "d8 failed" }
 
 Write-Host "[5/7] add classes.dex into apk ..."
