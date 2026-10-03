@@ -273,7 +273,7 @@ public class SettingsView extends LinearLayout {
         crashBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showCrashLog(); }
         });
-        LinearLayout.LayoutParams cbLp = new LinearLayout.MarginLayoutParams(
+        LinearLayout.LayoutParams cbLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         cbLp.leftMargin = Ui.dp(8);
         crashBtn.setLayoutParams(cbLp);

@@ -34,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.1.10";
+    public static final String VERSION_TAG = "v2.1.11";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -265,8 +265,25 @@ public class GitHub {
     }
 
     // ================================================================== API
+    /**
+     * 公开接口不该被坏令牌连累。
+     *
+     * 本地可能存着已失效的令牌，带着它请求会 401 Bad credentials ——
+     * 连查最新 Release 都失败，可仓库是公开的，本来不需要令牌。
+     * 所以 401 时去掉令牌重试；能成说明存的是坏令牌，顺手清掉。
+     */
     public static JSONObject api(Context c, String path) throws Exception {
-        return new JSONObject(request("GET", API + path, null, token(c), "application/vnd.github+json"));
+        String tok = token(c);
+        try {
+            return new JSONObject(request("GET", API + path, null, tok, "application/vnd.github+json"));
+        } catch (Exception e) {
+            if (tok == null || tok.length() == 0) throw e;
+            if (!String.valueOf(e.getMessage()).startsWith("HTTP 401")) throw e;
+
+            JSONObject j = new JSONObject(request("GET", API + path, null, null, "application/vnd.github+json"));
+            try { logout(c); } catch (Exception ignored) { }
+            return j;
+        }
     }
 
     public static JSONObject apiPut(Context c, String path, String json) throws Exception {

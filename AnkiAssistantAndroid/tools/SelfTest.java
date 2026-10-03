@@ -124,8 +124,8 @@ public class SelfTest {
             ok("字段存在 " + CardFormat.FIELDS[i], f.has(CardFormat.FIELDS[i]), CardFormat.FIELDS[i]);
         }
         eq("正面=单词", f.optString("单词"), "epsilon");
-        eq("换行转成 <br>", f.optString("易混").indexOf("<br>"), f.optString("易混").indexOf("\n"));
-        ok("换行确实变成了 <br>", f.optString("易混").indexOf("<br>") >= 0, f.optString("易混"));
+        ok("换行转成 <br>", f.optString("易混").indexOf("<br>") >= 0, f.optString("易混"));
+        ok("原始换行被替换掉", f.optString("易混").indexOf("\n") < 0, f.optString("易混"));
 
         JSONObject ai2 = new JSONObject();
         ai2.put("definition", "a<b>c");

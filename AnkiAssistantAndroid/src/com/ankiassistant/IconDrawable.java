@@ -33,7 +33,7 @@ public class IconDrawable extends Drawable {
 
     @Override
     public void draw(Canvas canvas) {
-        RectF b = getBounds();
+        android.graphics.Rect b = getBounds();
         float w = b.width(), h = b.height();
         if (w <= 0 || h <= 0) return;
         canvas.save();

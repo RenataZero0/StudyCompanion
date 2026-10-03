@@ -49,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.1.10";
+        public const string VersionTag = "v2.1.11";
 
         public const string SyncPath = "sync/progress.txt";
         /// <summary>打卡记录的 CSV 也会自动传到这里，不用手动导出</summary>
@@ -186,11 +186,41 @@ namespace StudyCompanion
             return s.Length > 200 ? s.Substring(0, 200) + "…" : s;
         }
 
+        /// <summary>令牌失效时触发（用来提示用户重新登录）</summary>
+        public static Action AuthLost;
+
+        /// <summary>
+        /// 公开接口不该被坏令牌连累。
+        ///
+        /// 本地可能存着一个已经失效的令牌（过期、被撤销、或换机器后无效），
+        /// 带着它请求会得到 401 Bad credentials —— 连查最新 Release 都失败，
+        /// 但仓库是公开的，这个请求本来就不需要令牌。
+        /// 所以遇到 401 就**去掉令牌重试一次**；能成，说明存的是坏令牌，顺手清掉。
+        /// </summary>
         public static Dictionary<string, object> Api(string method, string path, string jsonBody)
+        {
+            try
+            {
+                return ApiWith(method, path, jsonBody, Token);
+            }
+            catch (Exception ex)
+            {
+                if (string.IsNullOrEmpty(Token)) throw;
+                if (!ex.Message.StartsWith("HTTP 401", StringComparison.Ordinal)) throw;
+
+                var d = ApiWith(method, path, jsonBody, null);
+                try { Logout(); } catch { }
+                try { MainForm.NotifyHeaderChanged(); } catch { }
+                try { if (AuthLost != null) AuthLost(); } catch { }
+                return d;
+            }
+        }
+
+        static Dictionary<string, object> ApiWith(string method, string path, string jsonBody, string token)
         {
             string url = ApiBase + path;
             string accept = "application/vnd.github+json";
-            var r = Req(method, url, Token, accept);
+            var r = Req(method, url, token, accept);
             if (jsonBody != null)
             {
                 byte[] b = Encoding.UTF8.GetBytes(jsonBody);

@@ -100,10 +100,14 @@ public class AiClient {
         }
         if (o.has("error")) {
             String msg;
-            if (o.get("error") instanceof JSONObject) {
-                msg = o.getJSONObject("error").optString("message", String.valueOf(o.opt("error")));
-            } else {
-                msg = o.optString("error", "unknown error");
+            try {
+                if (o.get("error") instanceof JSONObject) {
+                    msg = o.getJSONObject("error").optString("message", String.valueOf(o.opt("error")));
+                } else {
+                    msg = o.optString("error", "unknown error");
+                }
+            } catch (JSONException inner) {
+                msg = String.valueOf(o.opt("error"));
             }
             throw new AiException("AI 接口报错：" + msg);
         }
@@ -174,7 +178,7 @@ public class AiClient {
     private static String readAll(InputStream in) throws Exception {
         if (in == null) return "";
         java.io.BufferedReader r = new java.io.BufferedReader(
-                new InputStreamReader(in, Charset.forName("UTF-8")));
+                new java.io.InputStreamReader(in, Charset.forName("UTF-8")));
         StringBuilder sb = new StringBuilder();
         String line;
         while ((line = r.readLine()) != null) sb.append(line).append('\n');

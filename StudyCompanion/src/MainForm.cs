@@ -934,7 +934,15 @@ namespace StudyCompanion
         public static void NotifyHeaderChanged()        {
             if (_inst != null)
             {
-                try { _inst.BeginInvoke((MethodInvoker)delegate { _inst._header.Invalidate(); }); }
+                try
+                {
+                    _inst.BeginInvoke((MethodInvoker)delegate
+                    {
+                        _inst._header.Invalidate();
+                        // GitHub 药丸在底部状态栏上，登出后这里也得重画
+                        _inst._status.Invalidate();
+                    });
+                }
                 catch { }
             }
         }

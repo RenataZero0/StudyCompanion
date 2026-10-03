@@ -80,7 +80,7 @@ public class BrowseView extends LinearLayout {
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         seg.addView(segDraft, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        LinearLayout.LayoutParams segLp = new LinearLayout.MarginLayoutParams(
+        LinearLayout.LayoutParams segLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         segLp.leftMargin = Ui.dp(8);
         segDraft.setLayoutParams(segLp);
@@ -223,7 +223,7 @@ public class BrowseView extends LinearLayout {
         clear.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { confirmClearDrafts(); }
         });
-        LinearLayout.LayoutParams clp = new LinearLayout.MarginLayoutParams(
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         clp.leftMargin = Ui.dp(8);
         row.addView(clear, clp);
@@ -265,7 +265,7 @@ public class BrowseView extends LinearLayout {
         edit.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { openInDesktop(); }
         });
-        LinearLayout.LayoutParams elp = new LinearLayout.MarginLayoutParams(
+        LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         elp.leftMargin = Ui.dp(6);
         row.addView(edit, elp);
@@ -276,7 +276,7 @@ public class BrowseView extends LinearLayout {
         del.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { confirmDelete(); }
         });
-        LinearLayout.LayoutParams dlp = new LinearLayout.MarginLayoutParams(
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         dlp.leftMargin = Ui.dp(6);
         row.addView(del, dlp);
@@ -377,21 +377,27 @@ public class BrowseView extends LinearLayout {
         return new AnkiClient(store.ankiHost(), store.ankiPort(), store.ankiApiKey());
     }
 
+    /** 组装 Anki 搜索语句：牌组 + 用户输入（支持 Anki 搜索语法） */
+    private String buildQuery(String user) {
+        String q = "";
+        if (selectedDeck.length() > 0) q = "deck:\"" + selectedDeck + "\"";
+        if (user != null && user.length() > 0) q = (q.length() > 0 ? q + " " : "") + user;
+        if (q.length() == 0) q = "deck:*";
+        return q;
+    }
+
     private void query() {
         cloudStatus.setText("正在查询…");
         cloudStatus.setTextColor(Ui.TEXT_DIM);
         final String user = searchInput.getText().toString().trim();
-        String q = "";
-        if (selectedDeck.length() > 0) q = "deck:\"" + selectedDeck + "\"";
-        if (user.length() > 0) q = (q.length() > 0 ? q + " " : "") + user;
-        if (q.length() == 0) q = "deck:*";
+        final String query = buildQuery(user);
 
         Th.bg(new Runnable() {
             @Override
             public void run() {
                 try {
                     AnkiClient anki = client();
-                    JSONArray ids = anki.findNotes(q);
+                    JSONArray ids = anki.findNotes(query);
                     JSONArray take = new JSONArray();
                     for (int i = 0; i < ids.length() && i < 100; i++) take.put(ids.opt(i));
                     final JSONArray info = take.length() == 0
@@ -515,7 +521,8 @@ public class BrowseView extends LinearLayout {
             java.util.Iterator<String> it = fs.keys();
             while (it.hasNext()) {
                 String k = it.next();
-                fields.put(k, fieldValue(note, k));
+                try { fields.put(k, fieldValue(note, k)); }
+                catch (org.json.JSONException ignored) { }
             }
         }
         cloudPane.setVisibility(GONE);
@@ -722,7 +729,7 @@ public class BrowseView extends LinearLayout {
         del.setText("删");
         Ui.danger(del);
         del.setTextSize(13);
-        LinearLayout.LayoutParams dlp = new LinearLayout.MarginLayoutParams(
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         dlp.leftMargin = Ui.dp(6);
         del.setLayoutParams(dlp);

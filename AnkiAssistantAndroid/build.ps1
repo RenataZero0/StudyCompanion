@@ -75,8 +75,14 @@ $gen  = @(Get-ChildItem "$out\gen" -Recurse -Filter *.java -ErrorAction Silently
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "[4/7] d8 (dex) ..."
-$classes = @(Get-ChildItem "$out\classes" -Recurse -Filter *.class | ForEach-Object { $_.FullName })
-& "$BT\d8.bat" --lib $AJAR --min-api 21 --output "$out\dex" @classes
+# NOTE: pass ONE jar instead of hundreds of .class paths - Windows caps the command
+# line at 8191 chars and "The command line is too long" silently killed d8 here.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$jar = "$out\classes.jar"
+if (Test-Path $jar) { Remove-Item $jar -Force }
+[System.IO.Compression.ZipFile]::CreateFromDirectory("$out\classes", $jar)
+if (-not (Test-Path $jar)) { throw "classes.jar not produced" }
+& "$BT\d8.bat" --lib $AJAR --min-api 21 --output "$out\dex" $jar
 if ($LASTEXITCODE -ne 0) { throw "d8 failed" }
 
 Write-Host "[5/7] add classes.dex into apk ..."
