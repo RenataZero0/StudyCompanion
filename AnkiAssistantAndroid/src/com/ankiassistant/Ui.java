@@ -53,6 +53,15 @@ public class Ui {
         return d;
     }
 
+    /** 描边圆角背景 */
+    public static GradientDrawable roundStroke(int color, int stroke, float radiusDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(radiusDp));
+        d.setStroke(dp(1), stroke);
+        return d;
+    }
+
     /** 按钮：正常色 + 按下变暗 */
     public static StateListDrawable press(int color, float radiusDp) {
         StateListDrawable s = new StateListDrawable();

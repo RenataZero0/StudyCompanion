@@ -243,9 +243,14 @@ public class MainActivity extends Activity implements MainView.Listener {
     public void openUrl(String url) {
         if (url == null || url.length() == 0) return;
 
-        // bilipick:<关键词> —— 去 B 站挑几个相关视频列出来
+        // bilipick:<关键词>|<当天主题> —— 去 B 站挑相关视频；
+        // 主题用于在多 P 合集里自动定位最相关的那一集
         if (url.startsWith("bilipick:")) {
-            pickBiliVideo(url.substring("bilipick:".length()));
+            String rest = url.substring("bilipick:".length());
+            int bar = rest.indexOf('|');
+            String kw = bar < 0 ? rest : rest.substring(0, bar);
+            String topics = bar < 0 ? "" : rest.substring(bar + 1);
+            pickBiliVideo(kw, topics);
             return;
         }
 
@@ -272,7 +277,7 @@ public class MainActivity extends Activity implements MainView.Listener {
      * 去 B 站查一遍，按「跟 A Level / CIE 沾不沾边」打分排序，
      * 把最好的几个列出来。查不到就退回搜索页。
      */
-    private void pickBiliVideo(final String keyword) {
+    private void pickBiliVideo(final String keyword, final String topics) {
         busy = new AlertDialog.Builder(this)
                 .setTitle("正在找视频…").setMessage(keyword)
                 .setCancelable(false).show();
@@ -290,13 +295,14 @@ public class MainActivity extends Activity implements MainView.Listener {
                 final List<Bili.Video> fl = list;
                 final String fe = err;
                 runOnUiThread(new Runnable() {
-                    public void run() { showBiliPicker(keyword, fl, fe); }
+                    public void run() { showBiliPicker(keyword, topics, fl, fe); }
                 });
             }
         }).start();
     }
 
-    private void showBiliPicker(final String keyword, final List<Bili.Video> list, String err) {
+    private void showBiliPicker(final String keyword, final String topics,
+            final List<Bili.Video> list, String err) {
         dismissBusy();
 
         if (list == null || list.isEmpty()) {
@@ -319,7 +325,7 @@ public class MainActivity extends Activity implements MainView.Listener {
         sv.addView(box);
 
         for (int i = 0; i < list.size(); i++) {
-            box.addView(videoButton(list.get(i), i == 0));
+            box.addView(videoButton(list.get(i), i == 0, topics));
         }
 
         // 限高：按钮再多也不把对话框撑出屏幕
@@ -343,7 +349,7 @@ public class MainActivity extends Activity implements MainView.Listener {
     }
 
     /** 一个视频 = 一个圆角按钮：标题 + 说明 + 分P标记 */
-    private android.widget.TextView videoButton(final Bili.Video v, boolean top) {
+    private android.widget.TextView videoButton(final Bili.Video v, boolean top, final String topics) {
         float d = getResources().getDisplayMetrics().density;
         android.widget.TextView tv = new android.widget.TextView(this);
 
@@ -370,17 +376,17 @@ public class MainActivity extends Activity implements MainView.Listener {
 
         tv.setOnClickListener(new android.view.View.OnClickListener() {
             public void onClick(android.view.View w) {
-                if (v.videos > 1) pickPart(v);
+                if (v.videos > 1) pickPart(v, topics);
                 else openBiliPart(v, 0);
             }
         });
         return tv;
     }
 
-    /** 多 P 视频：先读分 P 列表，再让用户点某一 P */
-    private void pickPart(final Bili.Video v) {
+    /** 多 P 视频：先读分 P 列表，按当天主题匹配出最相关那一集直接跳 */
+    private void pickPart(final Bili.Video v, final String topics) {
         busy = new AlertDialog.Builder(this)
-                .setTitle("正在读取分 P…").setMessage(v.title)
+                .setTitle("正在定位分 P…").setMessage(v.title)
                 .setCancelable(false).show();
         new Thread(new Runnable() {
             public void run() {
@@ -389,17 +395,28 @@ public class MainActivity extends Activity implements MainView.Listener {
                 try { parts = Bili.parts(v.bvid); } catch (Exception e) { err = String.valueOf(e.getMessage()); }
                 final List<Bili.Part> fp = parts;
                 final String fe = err;
+                final int bi = (fp == null || fp.isEmpty()) ? -1 : Bili.bestPart(fp, topics);
                 runOnUiThread(new Runnable() {
-                    public void run() { showPartsDialog(v, fp, fe); }
+                    public void run() { showPartsDialog(v, topics, fp, fe, bi); }
                 });
             }
         }).start();
     }
 
-    private void showPartsDialog(final Bili.Video v, List<Bili.Part> parts, String err) {
+    private void showPartsDialog(final Bili.Video v, String topics,
+            List<Bili.Part> parts, String err, int bestIndex) {
         dismissBusy();
         // 读不到分 P 就整个视频打开，别卡住用户
         if (parts == null || parts.isEmpty()) { openBiliPart(v, 0); return; }
+
+        // 匹配到了对应的那一集，直接跳过去（toast 说明挑了哪一集）
+        if (bestIndex >= 0) {
+            Bili.Part p = parts.get(bestIndex);
+            String label = p.part.length() > 0 ? p.part : ("第 " + p.page + " P");
+            toast("已定位到 P" + p.page + " · " + label);
+            openBiliPart(v, p.page);
+            return;
+        }
 
         float d = getResources().getDisplayMetrics().density;
         android.widget.ScrollView sv = new android.widget.ScrollView(this);

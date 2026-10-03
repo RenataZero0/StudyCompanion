@@ -182,7 +182,7 @@ public class MainActivity extends Activity {
         r.addView(spacer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         TextView tip = new TextView(this);
-        tip.setText("平板端\n左侧选择栏\ncan 拖动收起 ☰");
+        tip.setText("点 ☰ 可收起\n本栏只在平板上出现");
         tip.setTextColor(Ui.TEXT_DIM);
         tip.setTextSize(11);
         tip.setPadding(Ui.dp(8), Ui.dp(8), Ui.dp(8), Ui.dp(8));
@@ -193,11 +193,7 @@ public class MainActivity extends Activity {
     private LinearLayout buildBottomBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setBackgroundColor(Ui.WHITE);
         bar.setPadding(Ui.dp(4), Ui.dp(4), Ui.dp(4), Ui.dp(4));
-        View line = new View(this);
-        line.setBackgroundColor(Ui.LINE);
-        // 上边框用一个 1px 的 View 放不进水平布局，改用背景
         bar.setBackground(Ui.roundStroke(Ui.WHITE, Ui.LINE, 0));
         String[] labels = {"制卡", "浏览", "设置"};
         int[] icons = {IconDrawable.ADD, IconDrawable.CARDS, IconDrawable.SLIDERS};

@@ -302,11 +302,29 @@ public class Links {
         if (ls.yt.length() > 0)
             out.add(R("▶ YouTube 搜索", "https://www.youtube.com/results?search_query=" + enc(ls.yt)));
         if (ls.bl.length() > 0) {
-            // bilipick: 是给 MainActivity 看的自定义前缀 —— 点开后会去 B 站查一遍，
-            // 挑出最相关的几个视频直接列出来，而不是把用户丢进搜索结果页
-            out.add(R("▶ Bilibili 视频", "bilipick:" + ls.bl));
+            // bilipick:<关键词>|<当天具体主题> —— 主题用来在多 P 合集里定位对应那一集
+            String topics = topicsFor(s);
+            out.add(R("▶ Bilibili 视频",
+                    "bilipick:" + ls.bl + (topics.length() > 0 ? "|" + topics : "")));
         }
         return out;
+    }
+
+    /**
+     * 提取当天任务的具体主题：明细行去掉 "· §1.1 " 前缀，
+     * 跳过"做练习"这种作业行。结果用 | 连接，例如 "位移与速度|加速度"。
+     */
+    static String topicsFor(ScheduleData.Slot s) {
+        StringBuilder sb = new StringBuilder();
+        if (s == null) return "";
+        for (int i = 1; i < s.body.size(); i++) {
+            String line = s.body.get(i).trim();
+            String t = line.replaceFirst("^[·•]\\s*(?:§\\s*\\d+(?:\\.\\d+)?\\s*)?", "").trim();
+            if (t.length() == 0 || t.startsWith("做")) continue;
+            if (sb.length() > 0) sb.append("|");
+            sb.append(t);
+        }
+        return sb.toString();
     }
 
     /** 该时段第一个小节号（用于显示，比如 §1.5） */

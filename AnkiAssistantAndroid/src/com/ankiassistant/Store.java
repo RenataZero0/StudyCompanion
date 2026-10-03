@@ -58,6 +58,9 @@ public class Store {
     public boolean autoSync() { return sp.getBoolean("autoSync", true); }
     public void setAutoSync(boolean v) { sp.edit().putBoolean("autoSync", v).apply(); }
 
+    public boolean introShown() { return sp.getBoolean("introShown", false); }
+    public void setIntroShown(boolean v) { sp.edit().putBoolean("introShown", v).apply(); }
+
     /** 当前生效的 AI 接口地址：自定义档直接读 aiBaseUrl，预设档按 id 推导（允许覆盖） */
     public String aiBaseUrlEffective() {
         String custom = aiBaseUrl().trim();

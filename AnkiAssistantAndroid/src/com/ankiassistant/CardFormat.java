@@ -207,6 +207,22 @@ public class CardFormat {
         return noteFields(word, null);
     }
 
+    /**
+     * 把编辑器里读回的背面字段 + 输入框里的单词，合成一张完整笔记的字段表。
+     * 编辑器里的内容是用户手动改过的，以它为准（覆盖 AI 的原始输出）。
+     */
+    public static JSONObject mergeNote(String word, JSONObject back) {
+        JSONObject f = new JSONObject();
+        try {
+            f.put("单词", escape(word == null ? "" : word.trim()));
+            for (int i = 1; i < FIELDS.length; i++) {
+                String name = FIELDS[i];
+                f.put(name, back == null ? "" : back.optString(name, ""));
+            }
+        } catch (JSONException ignored) { }
+        return f;
+    }
+
     public static String escape(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
