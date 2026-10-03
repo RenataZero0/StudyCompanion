@@ -4,6 +4,68 @@
 
 ---
 
+## v2.1.8 —— 修「点 B 站搜索却弹出菜单」；链接优先用客户端打开
+
+### 修：点「Bilibili 搜索」会弹出一个内容重复的菜单
+
+卡片上有一排链接胶囊：
+
+```
+[ExamSolutions · SUVAT] [MIT 8.01 经典力学] [▶ YouTube 搜索] [▶ Bilibili 搜索（免翻墙）]
+```
+
+点最后一个「Bilibili 搜索」不会去 B 站，而是弹出一个
+**「配套教学视频资源」菜单**，菜单里又是同样那几项 —— 看着就像重复了一遍。
+
+原因在 `MainView` 里：
+
+```java
+if (i == links.size() - 1) hit(pr, A_MENU, null, idx);   // 最后一个胶囊写死成"打开菜单"
+else hit(pr, A_URL, links.get(i)[1], idx);
+```
+
+最后一个胶囊被**硬编码**成"打开菜单"，可 `Links.forSlot()` 返回的全是真实链接，
+**根本没有菜单项**。那段逻辑是从桌面版搬过来的（桌面版只有一个
+「配套视频资源 ▾」按钮，才需要菜单），搬到安卓之后没改干净。
+
+现在所有胶囊都直接打开自己的链接，没人用的弹出菜单也删了。
+
+### 新增：装了客户端就直接跳客户端
+
+YouTube / B 站的网页版在手机浏览器里体验很差（要登录、要验证、还慢），
+现在会优先跳 App：
+
+| 链接 | 跳转 |
+|---|---|
+| `search.bilibili.com/all?keyword=X` | `bilibili://search?keyword=X` |
+| `www.bilibili.com/video/BVxxx` | `bilibili://video/BVxxx` |
+| `youtube.com/watch?v=ID` / `youtu.be/ID` | `vnd.youtube:ID` |
+| YouTube 搜索 / 播放列表 | 交给 YouTube 处理网页链接 |
+
+客户端没装、或跳转失败，自动退回浏览器。
+
+### 踩的坑：Android 11+ 的包可见性
+
+第一版写完，点了还是跳浏览器。查下来是我判断"客户端装没装"的方式在
+Android 11+ 上被限制了 —— 不声明 `<queries>` 的话，
+`getPackageInfo("tv.danmaku.bili")` 会抛 `NameNotFoundException`，
+于是被误判成"没装"，永远走浏览器分支。
+
+在 `AndroidManifest.xml` 里补上：
+
+```xml
+<queries>
+    <package android:name="tv.danmaku.bili" />
+    <package android:name="com.google.android.youtube" />
+    <intent> ... <data android:scheme="bilibili" /> </intent>
+</queries>
+```
+
+实测（OPPO Pad 3，装了 B 站）：点「Bilibili 搜索（免翻墙）」会直接进
+`BiliMainSearchActivity`，搜索词也正确带过去了。
+
+---
+
 ## v2.1.7 —— 升级弹窗按钮不再全大写
 
 Material 主题默认把对话框按钮文字转成全大写，所以 v2.1.5 的弹窗里

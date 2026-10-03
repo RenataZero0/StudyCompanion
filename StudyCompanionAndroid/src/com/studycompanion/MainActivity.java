@@ -229,15 +229,122 @@ public class MainActivity extends Activity implements MainView.Listener {
     }
 
     // ================================================================== CSV
+    /** 包名 */
+    static final String PKG_YOUTUBE = "com.google.android.youtube";
+    static final String PKG_BILI = "tv.danmaku.bili";
+
+    /**
+     * 打开链接。装了对应客户端就优先用客户端 ——
+     * YouTube / B 站的网页版在手机浏览器里体验很差，直接跳 App 更顺。
+     * 客户端没装（或跳转失败）再退回系统默认浏览器。
+     */
     @Override
     public void openUrl(String url) {
+        if (url == null || url.length() == 0) return;
+
+        for (Intent candidate : appIntents(url)) {
+            try {
+                candidate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(candidate);
+                return;
+            } catch (Exception ignored) {
+                // 换下一个候选（客户端 -> 网页）
+            }
+        }
         try {
-            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(i);
+            Intent web = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            web.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(web);
         } catch (Exception e) {
             toast("打不开这个链接：" + url);
         }
+    }
+
+    /** 按优先级列出候选 Intent：先客户端，再网页 */
+    private java.util.List<Intent> appIntents(String url) {
+        java.util.List<Intent> out = new java.util.ArrayList<Intent>();
+        String low = url.toLowerCase(java.util.Locale.US);
+
+        if (low.contains("youtube.com") || low.contains("youtu.be")) {
+            if (installed(PKG_YOUTUBE)) {
+                String scheme = youtubeScheme(url);
+                if (scheme != null) {
+                    Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(scheme));
+                    i.setPackage(PKG_YOUTUBE);
+                    out.add(i);
+                }
+                // 让 YouTube 自己处理网页链接（它也声明了 youtube.com）
+                Intent i2 = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                i2.setPackage(PKG_YOUTUBE);
+                out.add(i2);
+            }
+        } else if (low.contains("bilibili.com") || low.contains("b23.tv")) {
+            if (installed(PKG_BILI)) {
+                String scheme = biliScheme(url);
+                if (scheme != null) {
+                    Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(scheme));
+                    i.setPackage(PKG_BILI);
+                    out.add(i);
+                }
+                Intent i2 = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                i2.setPackage(PKG_BILI);
+                out.add(i2);
+            }
+        }
+        return out;
+    }
+
+    private boolean installed(String pkg) {
+        try {
+            getPackageManager().getPackageInfo(pkg, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * youtube.com/watch?v=ID      -> vnd.youtube:ID
+     * youtu.be/ID                 -> vnd.youtube:ID
+     * 其他（搜索、频道、播放列表）-> null，交给网页链接
+     */
+    private String youtubeScheme(String url) {
+        try {
+            Uri u = Uri.parse(url);
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase(java.util.Locale.US);
+            if (host.contains("youtu.be")) {
+                String id = u.getPath();
+                if (id != null && id.length() > 1) return "vnd.youtube:" + id.substring(1);
+            }
+            String v = u.getQueryParameter("v");
+            if (v != null && v.length() > 0) return "vnd.youtube:" + v;
+        } catch (Exception ignored) { }
+        return null;
+    }
+
+    /**
+     * search.bilibili.com/all?keyword=X  -> bilibili://search?keyword=X
+     * www.bilibili.com/video/BVxxxx      -> bilibili://video/BVxxxx
+     * 其他 -> null
+     */
+    private String biliScheme(String url) {
+        try {
+            Uri u = Uri.parse(url);
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase(java.util.Locale.US);
+            String path = u.getPath() == null ? "" : u.getPath();
+
+            if (host.startsWith("search.")) {
+                String kw = u.getQueryParameter("keyword");
+                if (kw != null && kw.length() > 0) {
+                    return "bilibili://search?keyword=" + Uri.encode(kw);
+                }
+            }
+            if (path.startsWith("/video/")) {
+                String bv = path.substring("/video/".length());
+                if (bv.length() > 0) return "bilibili://video/" + bv;
+            }
+        } catch (Exception ignored) { }
+        return null;
     }
 
     @Override

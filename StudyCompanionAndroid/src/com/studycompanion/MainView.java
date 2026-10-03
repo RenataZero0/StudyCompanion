@@ -233,8 +233,8 @@ public class MainView extends View {
                 setViewIso(h.arg);
                 break;
             case A_MENU:
-                menuOwner = h.index;
-                menuItems = Links.forSlot(currentSlot(h.index));
+                // 菜单已废弃：所有链接都直接以胶囊形式展示
+                menuOwner = -1;
                 break;
             case A_CLOSE_MENU:
                 menuOwner = -1;
@@ -641,13 +641,13 @@ public class MainView extends View {
                 // X 也要偏移到卡片左边 —— 只偏移 Y 的话，
                 // 单栏时 pad≈0 看不出问题，平板两栏时标签会跑到卡片外面
                 pr.offset(pad, base);
-                boolean menu = menuOwner == idx && i == links.size() - 1;
-                Ui.roundRect(c, pr, pr.height() / 2, menu ? Ui.ACCENT_SOFT : 0xFFFFFFFF);
-                Ui.roundStroke(c, pr, pr.height() / 2, menu ? Ui.ACCENT : Ui.LINE, 1f);
-                Paint pl = Ui.font(12, false, menu ? Ui.ACCENT : Ui.SUB);
-                Ui.textC(c, links.get(i)[0], pr, pl);
-                if (i == links.size() - 1) hit(pr, A_MENU, null, idx);
-                else hit(pr, A_URL, links.get(i)[1], idx);
+                // 所有胶囊都直接打开自己的链接。
+                // 以前最后一个胶囊被写死成"打开菜单"，而 forSlot() 根本没有菜单项，
+                // 于是点「Bilibili 搜索」会弹出一个内容相同的菜单，看着像重复。
+                Ui.roundRect(c, pr, pr.height() / 2, 0xFFFFFFFF);
+                Ui.roundStroke(c, pr, pr.height() / 2, Ui.LINE, 1f);
+                Ui.textC(c, links.get(i)[0], pr, Ui.font(12, false, Ui.SUB));
+                hit(pr, A_URL, links.get(i)[1], idx);
             }
         }
         return y + h;
