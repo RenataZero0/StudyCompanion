@@ -34,37 +34,35 @@ StudyCompanionAndroid/_*.png
 Thumbs.db
 desktop.ini
 
-# ×Ô¼ì²úÎï
+# ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½
 _plan/checks.json
 
 
-# ·¢²¼ËµÃ÷²İ¸å£¨ÄÚÈİÒÑ·¢²¼µ½ Release Ò³£©
+# ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½ï¿½İ¸å£¨ï¿½ï¿½ï¿½ï¿½ï¿½Ñ·ï¿½ï¿½ï¿½ï¿½ï¿½ Release Ò³ï¿½ï¿½
 _release_notes.md
 
 
-# ×ÀÃæ¶Ë GitHub ×Ô¼ìÁÙÊ±²úÎï
+# ï¿½ï¿½ï¿½ï¿½ï¿½ GitHub ï¿½Ô¼ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
 StudyCompanion/_test/
 
 
-# ×ÀÃæ¶Ë×Ô¼ì¿ÉÖ´ĞĞÎÄ¼ş
+# ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ö´ï¿½ï¿½ï¿½Ä¼ï¿½
 StudyCompanion/ghtest.exe
 StudyCompanion/assetprobe.exe
 
 
-# Ä£ÄâÆ÷µ÷ÊÔÁÙÊ±½ØÍ¼
+# Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Í¼
 StudyCompanionAndroid/preview/phone-*.png
 
 
-# °²×°³ÌĞòµÄ±àÒëÖĞ¼ä²úÎï
+# ï¿½ï¿½×°ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½Ğ¼ï¿½ï¿½ï¿½ï¿½
 StudyCompanionSetup/build/
 
 
-# ¸üĞÂÈÕÖ¾µÄÉú³É¸±±¾£¨Î¨Ò»À´Ô´ÊÇ²Ö¿â¸ùÄ¿Â¼µÄ CHANGELOG.md£©
+# ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½É¸ï¿½ï¿½ï¿½ï¿½ï¿½Î¨Ò»ï¿½ï¿½Ô´ï¿½Ç²Ö¿ï¿½ï¿½Ä¿Â¼ï¿½ï¿½ CHANGELOG.mdï¿½ï¿½
 StudyCompanion/CHANGELOG.md
 StudyCompanionAndroid/assets/CHANGELOG.md
 
-
-# Anki ÖúÊÖµÄ±àÒëÖĞ¼ä²úÎï£¨¿ÉÖØĞÂÉú³É£©
-AnkiAssistantAndroid/build/
-*.idsig
-
+# ======== Anki åŠ©æ‰‹æ˜¯ç‹¬ç«‹ä»“åº“ï¼Œä¸å½’æœ¬ä»“åº“ç®¡ ========
+AnkiAssistant/
+AnkiAssistantAndroid/

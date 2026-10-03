@@ -1,9 +1,0 @@
-package com.ankiassistant;
-
-/**
- * 版本号唯一来源。build.ps1 会解析这里的 VERSION_TAG 生成 versionName / versionCode，
- * 这样 APK 上显示的版本永远不会和代码里的版本对不上（StudyCompanion 曾写死 manifest 导致一直显示 1.0）。
- */
-public class Version {
-    public static final String VERSION_TAG = "v1.0.0";
-}
