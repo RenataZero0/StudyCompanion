@@ -169,6 +169,9 @@ public class CreateView extends LinearLayout {
         editorWrap.addView(editor, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        // 千万不要忘了这一句：之前漏了 loadUrl，编辑器区域整块空白
+        editor.loadUrl(EDITOR_URL);
+
         // ---- 牌组 / 标签 ----
         LinearLayout metaCard = card();
         LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(

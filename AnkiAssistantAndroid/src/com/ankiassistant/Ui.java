@@ -70,6 +70,15 @@ public class Ui {
         return s;
     }
 
+    /** 按钮：正常色 + 按下变暗 + 描边（浅色按钮放在白卡片上也能看清边界） */
+    public static StateListDrawable pressStroke(int color, int stroke, float radiusDp) {
+        StateListDrawable s = new StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_pressed},
+                roundStroke(dim(color, 0.90f), stroke, radiusDp));
+        s.addState(new int[]{}, roundStroke(color, stroke, radiusDp));
+        return s;
+    }
+
     /** 实心按钮 */
     public static void btn(Button b, int bg, int fg) {
         b.setBackground(press(bg, 10));
@@ -82,8 +91,11 @@ public class Ui {
     /** 主按钮（蓝底白字） */
     public static void primary(Button b) { btn(b, ACCENT, WHITE); }
 
-    /** 次按钮（白底蓝字） */
-    public static void secondary(Button b) { btn(b, WHITE, ACCENT); }
+    /** 次按钮（白底蓝字 + 描边） */
+    public static void secondary(Button b) {
+        btn(b, WHITE, ACCENT);
+        b.setBackground(pressStroke(WHITE, 0xFFC9D8F8, 10));
+    }
 
     /** 危险按钮 */
     public static void danger(Button b) { btn(b, RED_SOFT, RED); }

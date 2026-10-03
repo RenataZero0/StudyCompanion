@@ -63,3 +63,8 @@ StudyCompanionSetup/build/
 StudyCompanion/CHANGELOG.md
 StudyCompanionAndroid/assets/CHANGELOG.md
 
+
+# Anki 助手的编译中间产物（可重新生成）
+AnkiAssistantAndroid/build/
+*.idsig
+
