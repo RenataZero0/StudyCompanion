@@ -3,8 +3,10 @@
 import re, sys, os, collections
 sys.stdout.reconfigure(encoding="utf-8")
 
-DATA = r"D:\UsrFiles\Documents\NCUK IFY Self Study\StudyCompanion\data"
-CUR = r"D:\UsrFiles\Documents\NCUK IFY Self Study\_plan\curriculum.py"
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+DATA = os.path.join(HERE, "..", "data")
+CUR = os.path.join(REPO, "02_学习与教材", "_plan", "curriculum.py")
 OFFSET = 11  # PM2&3: 印刷页 + 11 = PDF 页
 
 idx = {}

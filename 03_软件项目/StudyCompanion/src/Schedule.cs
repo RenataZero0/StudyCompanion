@@ -98,7 +98,8 @@ namespace StudyCompanion
             cands.Add(Path.Combine(Store.Root, "Schedule.xlsx"));
             cands.Add(Path.Combine(exeDir, "Schedule.xlsx"));
             cands.Add(Path.Combine(Path.GetDirectoryName(exeDir.TrimEnd('\\')), "Schedule.xlsx"));
-            cands.Add(@"D:\UsrFiles\Documents\NCUK IFY Self Study\Schedule.xlsx");
+            cands.Add(Path.Combine(Path.GetDirectoryName(exeDir.TrimEnd('\\')) ?? "", "02_学习与教材", "Schedule.xlsx"));
+            cands.Add(@"D:\UsrFiles\Documents\NCUK IFY Self Study\02_学习与教材\Schedule.xlsx");
 
             foreach (var c in cands)
                 if (!string.IsNullOrEmpty(c) && File.Exists(c)) return c;

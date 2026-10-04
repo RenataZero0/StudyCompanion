@@ -1,0 +1,23 @@
+﻿## Q4 Southampton EEE
+- `官方 | BEng EEE H600 | £10,050 / £33,500 Full-time | 2026/2027 | https://www.southampton.ac.uk/courses/fees/undergraduate/tuition-fees.page`
+- `官方 | MEng EEE H602 | £33,500 | 同上`
+- 学年 `官方`："sessional fees for 2026/2027"（总表页未印学年）| https://www.southampton.ac.uk/about/governance/regulations-policies/student-regulations/fees-charges-expenses
+- 上涨 `官方`："overseas students will increase every year for students starting their course from 1 August 2026."→ 第2~4年必涨；涨幅% 未查到 | https://www.southampton.ac.uk/courses/fees/undergraduate.page
+- 生活费 `官方` 周表：Halls £155 to £236；Private rent £115；Utilities £30；Wi-Fi £4；Phone £10；bus pass £9；transport £15；Food £50；Social £30；Clothing £20；Trips £25；Books £14；Laundry £5；无官方年度总额 | https://www.southampton.ac.uk/student-life/support-money/student-living-costs
+- 住宿 2026-27 `官方`：合同 "38 week, 41 week or 51 weeks"；£139.09（Wessex Lane）～£236.25（Crossings）/周 | https://www.southampton.ac.uk/student-life/accommodation/fees-contracts
+- 总费用（推算，41周/年，1 GBP = 9.3 CNY，未计涨幅）：BEng 3年 学费£100,500＋£39,237~49,200 ≈ £139,700~149,700 ≈ ¥1,299,000~1,392,000；MEng 4年 £134,000＋£52,316~65,600 ≈ £186,300~199,600 ≈ ¥1,733,000~1,856,000
+- EEE：官方；ABB 或以下入口：未查到（课程页仅 "Typical Offer AAA"）
+
+## Q5 Graduate Route
+- `官方 | gov.uk/graduate-visa | "2 years if you apply on or before 31 December 2026" / "18 months if you apply on or after 1 January 2027"；PhD 3 years；费 "£937"；IHS "£1,035" 每年；"You cannot extend your Graduate visa."`
+- `官方 | Appendix Graduate GR 8.1（Updated 3 August 2026）| "All other qualifications ... 2 years ... the application is made before 1 January 2027"；"18 months ... on or after 1 January 2027"；"PhD or other doctoral qualification | 3 years"；锚点=申请递交日；"not a route to settlement"；GR 1.4 一生一次 | https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-graduate`
+- 本科与硕士时长完全相同（同一档，按递交日）| https://www.gov.uk/graduate-visa/course-you-studied
+- 已生效 `官方`：HC 1333（2025-10-14 laid，生效 2027-01-01）| https://www.gov.uk/government/publications/statement-of-changes-to-the-immigration-rules-hc-1333-14-october-2025
+- 白皮书 `官方`（2025-05-12 CP 1326）："reduce the ability for graduates to remain in the UK after their studies to a period of 18 months"；"Double the standard qualifying period for settlement to 10 years." | https://www.gov.uk/government/news/immigration-white-paper-to-reduce-migration-and-strengthen-border
+- 已放弃 `官方`：MAC 2024-05-14 "retaining the Graduate route in its current form"；政府 2024-11-01 接受 MAC 建议；"for 2 years, or 3 years for doctoral students" | https://petition.parliament.uk/archived/petitions/654811
+- `中介`（律所 Lewis Silkin 2025-10-14）："lowered from two years to 18 months for all applicants other than those with a PhD"
+- `中介`（律所博客 EIN 2026-09-10）earned settlement：5→10 年，咨询 2026-02 关闭、逾 20 万回应、政府回应未公布 | https://www.ein.org.uk/blog/what-earned-settlement
+- `官方` 请愿 767146（2026-05-11 开启）：仅 37 签名、无政府回应 | https://petition.parliament.uk/petitions/767146
+- 2028 毕业：递交日≥2027-01-01 → 只得 18 个月，2 年不可得
+
+未查到: https://www.southampton.ac.uk/courses/electrical-electronic-engineering-degree-beng （截断）; https://www.southampton.ac.uk/courses/electrical-electronic-engineering-degree-beng/fees （非费用页）; https://www.southampton.ac.uk/courses/undergraduate/electrical-electronic-engineering-beng.page （非费用页）; https://www.southampton.ac.uk/courses/fees/undergraduate/2026-2027.page （404）; https://www.southampton.ac.uk/courses/fees/undergraduate/2025-2026.page （404）; https://www.southampton.ac.uk/~assets/doc/finance/2627%20how%20to%20pay%20fees%20March%202026_Louise%20K%20Payne.pdf （PDF 未读）; https://www.southampton.ac.uk/~assets/doc/student-services/FSTBudget.pdf （PDF 未读）; https://r.jina.ai/https://www.southampton.ac.uk/courses/electrical-electronic-engineering-degree-beng （fetch failed）; https://web.archive.org/web/2024/https://www.southampton.ac.uk/courses/fees/undergraduate/2024-2025.page （fetch failed）; https://commonslibrary.parliament.uk/research-briefings/cbp-10267/ （fetch failed）; https://hansard.parliament.uk/search?searchTerm=Graduate%20route （403）; https://assets.publishing.service.gov.uk/media/68ee3f1582670806f9d5e043/E03453738_-_HC_1333_-_Immigration_Rules_Changes__Web_Accessible_.pdf （PDF 未读）

@@ -1,4 +1,4 @@
-# Build the installer  ->  StudyCompanion-Setup.exe
+﻿# Build the installer  ->  StudyCompanion-Setup.exe
 # Usage: powershell -ExecutionPolicy Bypass -File build-setup.ps1
 #
 # The installer is a single self-contained exe: the main program, the schedule and
@@ -21,7 +21,8 @@ Write-Host "version: $ver"
 
 # ---- inputs must exist
 $exe   = Join-Path $appDir "StudyCompanion.exe"
-$sched = Join-Path (Split-Path -Parent $appDir) "Schedule.xlsx"
+$repoRoot = Split-Path -Parent (Split-Path -Parent $here)
+$sched = Join-Path $repoRoot "02_学习与教材\Schedule.xlsx"
 $books = Join-Path $appDir "data\books.tsv"
 $pages = Join-Path $appDir "data\pages.tsv"
 $ico   = Join-Path $appDir "assets\app.ico"

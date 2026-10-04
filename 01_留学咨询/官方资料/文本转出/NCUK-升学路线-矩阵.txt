@@ -1,0 +1,120 @@
+NCUK University Progression Routes (September 2026) - coverage matrix
+Source: NCUK official PDF, 10 pages, 91 partner universities.
+Mark = that NCUK programme / route is available at that university.
+NOTE: the subject columns (Acct&Fin / BusMgmt / CompSci / Events / EEE / Law) belong to
+      International Year One, NOT to the IFY. IFY and EAP columns carry no marks.
+Auto-extracted from the PDF by coordinate mapping - names may have minor wrap artifacts.
+
+
+[UK]
+  Aston University                               Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYTwo
+  Bangor                                         Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Law
+  University of Birmingham                       Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-Events, IYOne-Law, IYTwo
+  University of Bradford                         Art&Design, IYOne-EEE, IYTwo
+  University of Bristol*                         Art&Design, IYOne-CompSci, IYOne-Events, IYOne-Law, IYTwo
+  Brunel of London                               Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Cardiff                                        IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University for the Creative Arts               IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  De Montfort                                    IYOne-CompSci, IYOne-EEE, IYOne-Law, MPrep
+  University of Dundee                           Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Durham                                         Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Essex                            Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Exeter                           Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Falmouth                                       IYOne-Acct&Fin, IYOne-EEE, IYOne-Law
+  University of Glasgow                          Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Harper Adams                                   Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Heriot - Watt University of                    IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Huddersfield Keele University                  Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  University of Kent                             IYOne-Law, IYTwo
+  Kingston London                                IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  University of Lancashire*                      Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Lancaster                                      Art&Design, IYOne-CompSci, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  The of Law                                     Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Leeds                            Art&Design, IYOne-CompSci, IYOne-Events, IYOne-Law, IYTwo
+  Leeds Beckett                                  IYOne-CompSci, IYOne-EEE, IYTwo
+  University of Leicester                        Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  University of Liverpool                        Art&Design, IYOne-Acct&Fin, IYOne-Events, IYTwo
+  Liverpool Hope                                 Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Liverpool John Moores                          Art&Design, IYOne-CompSci, IYOne-Law
+  London Metropolitan                            Art&Design, IYOne-Law
+  London South Bank University                   Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  The University of Manchester                   Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Manchester Metropolitan                        Art&Design, IYOne-CompSci, IYOne-Law, IYTwo
+  Newcastle                                      Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Northumbria , Newcastle                        IYOne-CompSci, IYOne-Law
+  Norwich University of the Arts                 IYOne-Acct&Fin, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Oxford Brookes                                 Art&Design, IYOne-Acct&Fin, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Portsmouth                       Art&Design
+  Queen Mary University of London*               Art&Design, IYOne-Acct&Fin, IYOne-CompSci, IYOne-Events, IYOne-Law, IYTwo
+  Queen's Belfast                                Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Law, IYTwo, MPrep
+  University of Reading                          IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Robert Gordon                                  Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Royal Holloway, University of London           IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  University of Salford                          IYOne-CompSci, IYOne-Law
+  University of Sheffield                        Art&Design, IYOne-CompSci, IYOne-Events, IYTwo
+  Sheffield Hallam                               IYOne-CompSci, IYOne-Law
+  University of Surrey                           Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Sussex                           Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Swansea                                        Art&Design, IYOne-Events, IYOne-Law, MPrep
+  University of the West of England - UWE Bristol IYOne-Acct&Fin, IYOne-EEE
+  University of Westminster                      Art&Design, IYOne-Acct&Fin, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law
+  University of York                             Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[Australia]
+  University of New South Wales (UNSW)*          Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  The University of Newcastle, Australia*        Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo
+  Queensland University of Technology (QUT)      IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  RMIT University                                Art&Design, IYOne-CompSci, IYOne-Law, IYTwo, MPrep
+  Swinburne University of Technology             Art&Design, IYOne-CompSci, IYOne-Law, IYTwo, MPrep
+  The University of Western Australia*           IYOne-CompSci, IYOne-EEE, IYOne-Law, IYTwo
+
+[Canada]
+  University of Alberta                          Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Brock University                               Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Ottawa                           Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Regina                           Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Toronto Metropolitan                           IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[Italy]
+  NABA - Nuova Accademia Di Belle Arti           IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[New Zealand]
+  Auckland University of Technology              Art&Design, IYOne-CompSci, IYOne-Law, IYTwo
+  The University of Auckland*                    Art&Design, IYOne-BusMgmt, IYOne-CompSci, IYOne-Events, IYOne-Law, IYTwo
+  University of Canterbury                       Art&Design, IYOne-CompSci, IYOne-Law, IYTwo
+  Lincoln                                        Art&Design, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Massey                                         Art&Design, IYOne-CompSci, IYOne-Law, IYTwo
+  University of Otago*                           Art&Design, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Victoria University of Wellington              Art&Design, IYOne-CompSci, IYOne-Law, IYTwo
+  University of Waikato                          Art&Design, IYOne-CompSci, IYOne-Law, IYTwo
+
+[USA]
+  SUNY Oswego                                    Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  The University of Alabama at Birmingham        Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Drew University                                Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  George Mason                                   Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Illinois State                                 Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Oregon State                                   Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Suffolk                                        Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[Caribbean]
+  St. George's                                   Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[Malaysia]
+  Newcastle Medicine                             Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Reading                          Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Southampton                      Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Swinburne University of Technology Sarawak     Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[Malta]
+  Queen Mary University of London, Malta*        Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[Japan]
+  College of Liberal Arts - Yamanashi Gakuin     Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  University of Birmingham Dubai                 Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Heriot - Watt University Dubai                 IYOne-Events, IYOne-Law, IYTwo, MPrep
+  Murdoch University Dubai                       Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+
+[Vietnam]
+  RMIT Vietnam                                   Art&Design, IYOne-Acct&Fin, IYOne-BusMgmt, IYOne-CompSci, IYOne-EEE, IYOne-Events, IYOne-Law, IYTwo, MPrep
+  All information correct as of September        IYOne-Events
