@@ -41,29 +41,46 @@
 
 ## 目录结构
 
+本目录（`03_软件项目/`）只装程序源码；课表与教材在 `02_学习与教材/`。
+
 ```
-.
-├─ Schedule.xlsx              课表（两个平台共用，日程数据源）
-├─ 学习规划.md                 完整自学规划：时间安排、五阶段路线图、执行建议
-├─ caie-video-resources.md    配套教学视频资源清单
-├─ GITHUB_SETUP.md            启用 GitHub 登录 / 同步 / 自动更新的一次性配置
-├─ _plan/                     课表生成脚本（课程目录 + 排课引擎）
+NCUK IFY Self Study/
+├─ 01_留学咨询/                 留学咨询的全部资料（与本软件无关）
+├─ 02_学习与教材/
+│   ├─ Schedule.xlsx           课表（两个平台共用，日程数据源）
+│   ├─ 学习规划.md              完整自学规划：时间安排、五阶段路线图、执行建议
+│   ├─ caie-video-resources.md 配套教学视频资源清单
+│   ├─ Textbook/               课本 PDF（有版权，不入库）
+│   ├─ _plan/                  课表生成脚本（课程目录 + 排课引擎）
+│   └─ sync/StudyRecord.csv    手机 ↔ 电脑同步的学习记录
 │
-├─ StudyCompanionSetup/       Windows 安装程序（向导 + 卸载 + 注册表登记）
-├─ StudyCompanion/            Windows 桌面版
-│   ├─ StudyCompanion.exe     主程序
-│   ├─ build.ps1              编译（只要 Windows 自带的 csc.exe）
-│   ├─ src/                   C# 源码
-│   ├─ assets/                图标与截图
-│   └─ data/                  课本路径、小节页码索引
-│
-└─ StudyCompanionAndroid/     Android 版
-    ├─ StudyCompanion.apk     主程序
-    ├─ build.ps1              编译（aapt2 + javac + d8 + zipalign + apksigner，不需要 Gradle）
-    ├─ selftest.ps1           在电脑 JVM 上跑安卓端同一份解析代码做验证
-    ├─ src/                   Java 源码
-    ├─ assets/                课表与更新日志（打包进 APK）
-    └─ res/                   启动图标
+└─ 03_软件项目/
+    ├─ README.md               本文件
+    ├─ CHANGELOG.md            更新日志（安装程序的唯一来源，勿删）
+    ├─ GITHUB_SETUP.md         启用 GitHub 登录 / 同步 / 自动更新的一次性配置
+    │
+    ├─ StudyCompanionSetup/    Windows 安装程序（向导 + 卸载 + 注册表登记）
+    ├─ StudyCompanion/         Windows 桌面版
+    │   ├─ StudyCompanion.exe  主程序
+    │   ├─ build.ps1           编译（只要 Windows 自带的 csc.exe）
+    │   ├─ src/                C# 源码
+    │   ├─ assets/             图标与截图
+    │   └─ data/               课本路径、小节页码索引
+    │
+    └─ StudyCompanionAndroid/  Android 版
+        ├─ StudyCompanion.apk  主程序
+        ├─ build.ps1           编译（aapt2 + javac + d8 + zipalign + apksigner，不需要 Gradle）
+        ├─ selftest.ps1        在电脑 JVM 上跑安卓端同一份解析代码做验证
+        ├─ src/                Java 源码
+        ├─ assets/             课表与更新日志（打包进 APK）
+        └─ res/                启动图标
+```
+
+> ⚠️ **构建脚本依赖目录层级，别再挪。**
+> `StudyCompanion/build.ps1` 与 `StudyCompanionAndroid/build.ps1` 都从**本目录**取 `CHANGELOG.md`（`Split-Path -Parent $here`）；
+> `StudyCompanionSetup/build-setup.ps1` 从**本目录**取 `StudyCompanion/` 与 `CHANGELOG.md`，并从仓库根取 `02_学习与教材/Schedule.xlsx`；
+> `StudyCompanion/src/Schedule.cs` 与 `tools/fix_pm23_pages.py` 也各自记录了 `02_学习与教材/` 下的路径。
+
 
 
 ---
@@ -72,8 +89,10 @@
 
 ### Windows 版
 
+在**仓库根目录**执行：
+
 ```powershell
-cd StudyCompanion
+cd 03_软件项目\StudyCompanion
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
@@ -84,7 +103,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 需要 JDK + Android SDK 的 `build-tools` 与 `platform-34`（不需要 Gradle，也不需要 Android Studio）：
 
 ```powershell
-cd StudyCompanionAndroid
+cd 03_软件项目\StudyCompanionAndroid
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
@@ -100,13 +119,13 @@ powershell -ExecutionPolicy Bypass -File selftest.ps1
 
 ### 改课表
 
-课表由 `_plan/` 里的脚本生成：
+课表由 `02_学习与教材/_plan/` 里的脚本生成：
 
 ```powershell
-python _plan\build_schedule.py
+python 02_学习与教材\_plan\build_schedule.py
 ```
 
-`curriculum.py` 是六本课本的章节与页码目录，`build_schedule.py` 是排课引擎（时间模板、假期表、每科课时队列）。改完重新跑，会覆盖生成 `Schedule.xlsx`。
+`curriculum.py` 是六本课本的章节与页码目录，`build_schedule.py` 是排课引擎（时间模板、假期表、每科课时队列）。改完重新跑，会覆盖生成 `02_学习与教材/Schedule.xlsx`。
 
 > Android 版的课表是**打包进 APK** 的，改完课表要重新编译 APK。
 
@@ -114,6 +133,6 @@ python _plan\build_schedule.py
 
 ## 说明
 
-- **仓库里不含课本 PDF。** 课本是有版权的教材，仓库只记录它们的**书名、章节与页码**（`StudyCompanion/data/books.tsv`、`_plan/curriculum.py`）。本地的 PDF 请自行从正规渠道获取，放在 `Textbook/` 目录下，Windows 版会自动按文件名定位。
+- **仓库里不含课本 PDF。** 课本是有版权的教材，仓库只记录它们的**书名、章节与页码**（`StudyCompanion/data/books.tsv`、`02_学习与教材/_plan/curriculum.py`）。本地的 PDF 请自行从正规渠道获取，放在 `02_学习与教材/Textbook/` 目录下，Windows 版会自动按文件名定位。
 - Windows 版的 `data/progress.tsv`（打卡记录）已在 `.gitignore` 中排除，不会随仓库走。
 - Android 版用自签证书签名（`StudyCompanionAndroid/debug.keystore`）。更新应用时请保留同一个 keystore，否则无法覆盖安装、打卡记录会丢。
