@@ -96,10 +96,18 @@ namespace StudyCompanion
             }
             // 安装版：课表放在用户数据目录里，程序更新不会覆盖，用户也能自己改
             cands.Add(Path.Combine(Store.Root, "Schedule.xlsx"));
-            cands.Add(Path.Combine(exeDir, "Schedule.xlsx"));
-            cands.Add(Path.Combine(Path.GetDirectoryName(exeDir.TrimEnd('\\')), "Schedule.xlsx"));
-            cands.Add(Path.Combine(Path.GetDirectoryName(exeDir.TrimEnd('\\')) ?? "", "02_学习与教材", "Schedule.xlsx"));
-            cands.Add(@"D:\UsrFiles\Documents\NCUK IFY Self Study\02_学习与教材\Schedule.xlsx");
+
+            // 从 exe 所在目录往上一层层找：课表可能在 exe 旁边，也可能在
+            // 上层的 02_学习与教材/ 里（目录结构调整过几次，写死某一层会失效）
+            string dir = exeDir.TrimEnd('\\');
+            for (int up = 0; up < 5 && !string.IsNullOrEmpty(dir); up++)
+            {
+                cands.Add(Path.Combine(dir, "Schedule.xlsx"));
+                cands.Add(Path.Combine(dir, "02_学习与教材", "Schedule.xlsx"));
+                var parent = Path.GetDirectoryName(dir);
+                if (parent == null || parent == dir) break;
+                dir = parent;
+            }
 
             foreach (var c in cands)
                 if (!string.IsNullOrEmpty(c) && File.Exists(c)) return c;

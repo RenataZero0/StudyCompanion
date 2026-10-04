@@ -1,52 +1,41 @@
 # ============================================================
-# NCUK IFY Self Study
-# 目录划分：01_留学咨询 / 02_学习与教材 / 03_软件项目
+# StudyCompanion —— 学习助手（Windows 桌面版 / 安卓版 / Windows 安装程序）
+#
+# 本仓库只放三端软件；学习资料（留学咨询、教材、课表）留在本地，不入库。
 # ============================================================
 
-# ---- 绝对不入库：课本与官方 PDF（版权 + 体积）----
-02_学习与教材/Textbook/
-01_留学咨询/官方资料/PDF/
-pdfs/
-*.pdf
-
-# ---- 不入库：Anki 助手是独立仓库，不归本仓库管 ----
-03_软件项目/AnkiAssistant/
-03_软件项目/AnkiAssistantAndroid/
-
 # ---- 构建中间产物 ----
-03_软件项目/StudyCompanionAndroid/build/
-03_软件项目/StudyCompanionAndroid/_selftest/
-03_软件项目/StudyCompanionAndroid/*.apk.idsig
-03_软件项目/StudyCompanionSetup/build/
-02_学习与教材/_plan/__pycache__/
+StudyCompanionAndroid/build/
+StudyCompanionAndroid/_selftest/
+StudyCompanionAndroid/*.apk.idsig
+StudyCompanionSetup/build/
 **/__pycache__/
 
-# ---- 运行时产生的数据（含个人打卡记录）----
-03_软件项目/StudyCompanion/settings.ini
-03_软件项目/StudyCompanion/data/progress.tsv
-03_软件项目/StudyCompanion/data/progress.tsv.selftestbak
-03_软件项目/StudyCompanion/data/daycache.tsv
-03_软件项目/StudyCompanion/data/学习记录_*.csv
-03_软件项目/StudyCompanionAndroid/assets/daycache.tsv
+# ---- 运行时产生的数据（含个人打卡记录，绝不入库）----
+StudyCompanion/settings.ini
+StudyCompanion/data/progress.tsv
+StudyCompanion/data/progress.tsv.selftestbak
+StudyCompanion/data/daycache.tsv
+StudyCompanion/data/学习记录_*.csv
+StudyCompanionAndroid/assets/daycache.tsv
 **/学习记录_*.csv
 
-# ---- 自检输出 ----
-03_软件项目/StudyCompanion/selftest.txt
-03_软件项目/StudyCompanion/closetest.txt
-03_软件项目/StudyCompanion/layouttest.txt
-03_软件项目/StudyCompanion/_*.png
-03_软件项目/StudyCompanionAndroid/selftest.txt
-03_软件项目/StudyCompanionAndroid/_*.png
-03_软件项目/StudyCompanionAndroid/preview/phone-*.png
-03_软件项目/StudyCompanion/_test/
-03_软件项目/StudyCompanion/ghtest.exe
-03_软件项目/StudyCompanion/assetprobe.exe
+# ---- 自检与临时输出 ----
+StudyCompanion/selftest.txt
+StudyCompanion/closetest.txt
+StudyCompanion/layouttest.txt
+StudyCompanion/_*.png
+StudyCompanion/_test/
+StudyCompanion/ghtest.exe
+StudyCompanion/assetprobe.exe
+StudyCompanionAndroid/selftest.txt
+StudyCompanionAndroid/_*.png
+StudyCompanionAndroid/preview/phone-*.png
 
-# ---- 生成物（唯一来源是 03_软件项目/CHANGELOG.md）----
-03_软件项目/StudyCompanion/CHANGELOG.md
-03_软件项目/StudyCompanionAndroid/assets/CHANGELOG.md
-03_软件项目/_release_notes.md
-02_学习与教材/_plan/checks.json
+# ---- 生成物（唯一来源是仓库根目录的 CHANGELOG.md）----
+StudyCompanion/CHANGELOG.md
+StudyCompanionAndroid/assets/CHANGELOG.md
+_release_notes.md
 
 # ---- 系统垃圾 ----
 ~$*
