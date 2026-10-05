@@ -105,6 +105,11 @@ namespace StudyCompanion.Setup
             Directory.CreateDirectory(Path.Combine(dir, "data"));
             Res.Extract("App.books.tsv", Path.Combine(dir, "data", "books.tsv"), true);
             Res.Extract("App.pages.tsv", Path.Combine(dir, "data", "pages.tsv"), true);
+            // 「今天这几步怎么做」用的三张表：习题、章节自测、课本中文名
+            Directory.CreateDirectory(Path.Combine(dir, "data", "plan"));
+            Res.Extract("App.exercises.tsv", Path.Combine(dir, "data", "plan", "exercises.tsv"), true);
+            Res.Extract("App.checks.tsv", Path.Combine(dir, "data", "plan", "checks.tsv"), true);
+            Res.Extract("App.planbooks.tsv", Path.Combine(dir, "data", "plan", "books.tsv"), true);
 
             // 用户数据目录：只补缺，绝不覆盖已有的打卡记录
             Directory.CreateDirectory(UserDataDir);

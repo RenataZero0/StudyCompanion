@@ -25,9 +25,12 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $here)
 $sched = Join-Path $repoRoot "02_学习与教材\Schedule.xlsx"
 $books = Join-Path $appDir "data\books.tsv"
 $pages = Join-Path $appDir "data\pages.tsv"
+$planEx = Join-Path $appDir "data\plan\exercises.tsv"
+$planCk = Join-Path $appDir "data\plan\checks.tsv"
+$planBk = Join-Path $appDir "data\plan\books.tsv"
 $ico   = Join-Path $appDir "assets\app.ico"
 $chg   = Join-Path (Split-Path -Parent $appDir) "CHANGELOG.md"
-foreach ($p in @($exe, $sched, $books, $pages, $ico, $chg)) {
+foreach ($p in @($exe, $sched, $books, $pages, $planEx, $planCk, $planBk, $ico, $chg)) {
     if (-not (Test-Path $p)) { throw "missing input: $p" }
 }
 
@@ -61,6 +64,9 @@ if (Test-Path $target) { Remove-Item $target -Force }
     "/resource:$sched,App.Schedule.xlsx" `
     "/resource:$books,App.books.tsv" `
     "/resource:$pages,App.pages.tsv" `
+    "/resource:$planEx,App.exercises.tsv" `
+    "/resource:$planCk,App.checks.tsv" `
+    "/resource:$planBk,App.planbooks.tsv" `
     "/resource:$chg,App.CHANGELOG.md" `
     /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Core.dll `
     $srcs

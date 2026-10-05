@@ -58,6 +58,7 @@ namespace StudyCompanion
                 r.ReadWriteTimeout = 15000;
                 r.CachePolicy = new System.Net.Cache.RequestCachePolicy(
                     System.Net.Cache.RequestCacheLevel.NoCacheNoStore);
+                GitHub.ApplyProxy(r);
 
                 string text;
                 using (var resp = (HttpWebResponse)r.GetResponse())

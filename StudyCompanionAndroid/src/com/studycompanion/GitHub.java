@@ -34,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.1.15";
+    public static final String VERSION_TAG = "v2.1.16";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -150,13 +150,12 @@ public class GitHub {
 
     // ================================================================== HTTP
     static String request(String method, String url, String body, String token, String accept) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        HttpURLConnection conn = open(url);
         conn.setRequestMethod(method);
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(TIMEOUT);
         conn.setRequestProperty("Accept", accept);
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
-        applyTls(conn);
         if (token != null && token.length() > 0)
             conn.setRequestProperty("Authorization", "Bearer " + token);
         if (body != null) {
@@ -208,7 +207,7 @@ public class GitHub {
     public static DeviceCode deviceStart() throws Exception {
         if (!configured()) throw new Exception("还没有填入 OAuth App 的 Client ID");
         String body = form("client_id", CLIENT_ID, "scope", SCOPE);
-        HttpURLConnection conn = (HttpURLConnection) new URL(DEVICE_CODE_URL).openConnection();
+        HttpURLConnection conn = open(DEVICE_CODE_URL);
         conn.setRequestMethod("POST");
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(TIMEOUT);
@@ -216,7 +215,6 @@ public class GitHub {
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
-        applyTls(conn);
         OutputStream os = conn.getOutputStream();
         os.write(body.getBytes("UTF-8"));
         os.close();
@@ -273,7 +271,7 @@ public class GitHub {
     }
 
     static String postForm(String url, String body) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        HttpURLConnection conn = open(url);
         conn.setRequestMethod("POST");
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(TIMEOUT);
@@ -281,7 +279,6 @@ public class GitHub {
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
-        applyTls(conn);
         OutputStream os = conn.getOutputStream();
         os.write(body.getBytes("UTF-8"));
         os.close();
@@ -318,6 +315,36 @@ public class GitHub {
         if (TLS12 != null) {
             try { ((HttpsURLConnection) conn).setSSLSocketFactory(TLS12); } catch (Exception ignored) { }
         }
+    }
+
+    // ------------------------------------------------------------------ 代理
+    // 程序自己不能翻墙，但可以把你已经有的代理（Clash / v2ray 之类）填进来，
+    // 之后所有请求都从那儿走。取值在 MainActivity 启动时和用户保存后各刷一次。
+    private static java.net.Proxy PROXY;
+
+    public static void refreshProxy(android.content.Context c) {
+        PROXY = null;
+        String p = Store.proxy();
+        if (p == null || p.length() == 0) return;
+        int i = p.lastIndexOf(':');
+        if (i <= 0) return;
+        try {
+            PROXY = new java.net.Proxy(java.net.Proxy.Type.HTTP,
+                    new java.net.InetSocketAddress(p.substring(0, i),
+                            Integer.parseInt(p.substring(i + 1))));
+        } catch (Exception ignored) { PROXY = null; }
+    }
+
+    /** 当前有没有在用代理（界面显示用） */
+    public static boolean proxyOn() { return PROXY != null; }
+
+    /** 统一开连接：套上代理、打开 TLS1.2 */
+    static HttpURLConnection open(String url) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) (PROXY == null
+                ? new URL(url).openConnection()
+                : new URL(url).openConnection(PROXY));
+        applyTls(conn);
+        return conn;
     }
 
     // ================================================================== API
@@ -389,7 +416,11 @@ public class GitHub {
      *
      * 本地可能存着已失效的令牌，带着它请求会 401 Bad credentials ——
      * 连查最新 Release 都失败，可仓库是公开的，本来不需要令牌。
-     * 所以 401 时去掉令牌重试；能成说明存的是坏令牌，顺手清掉。
+     * 所以 401 时去掉令牌重试。
+     *
+     * ⚠️ 但**不能顺手 logout** —— 401 不代表令牌真的废了（网络抖动、代理插一脚、
+     * 限流、GitHub 偶发抽风都会回 401）。以前这里无条件清掉令牌，
+     * 结果偶发一次 401 就要重新授权。现在只有 /user 也回 401 才认定真的失效。
      */
     public static JSONObject api(Context c, String path) throws Exception {
         // 令牌可能快过期了，先用 refresh_token 续一下再发请求
@@ -402,8 +433,24 @@ public class GitHub {
             if (!String.valueOf(e.getMessage()).startsWith("HTTP 401")) throw e;
 
             JSONObject j = new JSONObject(request("GET", API + path, null, null, "application/vnd.github+json"));
-            try { logout(c); } catch (Exception ignored) { }
+            if (tokenLooksDead(c, tok)) {
+                try { logout(c); } catch (Exception ignored) { }
+            }
             return j;
+        }
+    }
+
+    /**
+     * 令牌是不是真的废了。只有 /user 明确回 401 才算；
+     * 网络错误、超时、5xx 一律当作「探不出来」，保留令牌别乱删。
+     */
+    static boolean tokenLooksDead(Context c, String tok) {
+        if (tok == null || tok.length() == 0) return true;
+        try {
+            request("GET", API + "/user", null, tok, "application/vnd.github+json");
+            return false;                       // 能读到用户信息 = 令牌好好的
+        } catch (Exception e) {
+            return String.valueOf(e.getMessage()).startsWith("HTTP 401");
         }
     }
 
@@ -508,23 +555,21 @@ public class GitHub {
     public static void downloadAsset(Context c, String url, java.io.File out,
                                      Progress p) throws Exception {
         boolean needsAuth = url != null && url.contains("api.github.com");
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        HttpURLConnection conn = open(url);
         conn.setInstanceFollowRedirects(false);
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(60000);
         conn.setRequestProperty("Accept", "application/octet-stream");
         if (needsAuth) conn.setRequestProperty("Authorization", "Bearer " + token(c));
         conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
-        applyTls(conn);
         int code = conn.getResponseCode();
         if (code == 302 || code == 301) {
             String loc = conn.getHeaderField("Location");
             conn.disconnect();
-            conn = (HttpURLConnection) new URL(loc).openConnection();
+            conn = open(loc);
             conn.setConnectTimeout(TIMEOUT);
             conn.setReadTimeout(60000);
             conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
-            applyTls(conn);
             code = conn.getResponseCode();
         }
         if (code < 200 || code >= 300) throw new Exception("下载失败 HTTP " + code);

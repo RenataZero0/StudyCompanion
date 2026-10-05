@@ -96,18 +96,23 @@ namespace StudyCompanion
     {
         public Slot Slot;
         public DateTime Date;
+        public int SlotIndex = -1;
         public bool ReadOnlyView;
         public event EventHandler Changed;
 
         readonly List<Pill> _pills = new List<Pill>();
         readonly Pill _doneBtn;
+        Pill _planBtn;
+        List<DailyPlan.Step> _planSteps = new List<DailyPlan.Step>();
         readonly string _bookTitle = "";
         List<string[]> _videoLinks = new List<string[]>();
         bool _hover;
 
-        public SlotCard(DateTime date, Slot s)
+        public SlotCard(DateTime date, Slot s) : this(date, s, -1) { }
+
+        public SlotCard(DateTime date, Slot s, int slotIndex)
         {
-            Date = date; Slot = s;
+            Date = date; Slot = s; SlotIndex = slotIndex;
             _bookTitle = VideoLinks.BookTitleForSlot(s);
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
@@ -128,6 +133,23 @@ namespace StudyCompanion
             _doneBtn.On = Store.IsDone(Date, Slot);
             _doneBtn.Text = _doneBtn.On ? "已完成 ✓" : "标记完成";
             Controls.Add(_doneBtn);
+
+            // 「今天这几步怎么做」——把这段安排展开成一步一步（完全离线，不需要联网）
+            _planSteps = DailyPlan.Steps(s);
+            if (HasPlanSteps)
+            {
+                _planBtn = new Pill();
+                _planBtn.Primary = true;
+                _planBtn.Text = PlanText();
+                _planBtn.Click += delegate
+                {
+                    using (var f = new PlanForm(Date, Slot, SlotIndex))
+                        f.ShowDialog(this);
+                    if (Changed != null) Changed(this, EventArgs.Empty);
+                };
+                _pills.Add(_planBtn);
+                Controls.Add(_planBtn);
+            }
 
             var links = VideoLinks.ForSlot(s);
             _videoLinks = links;
@@ -173,7 +195,36 @@ namespace StudyCompanion
             _doneBtn.On = done;
             _doneBtn.Text = done ? "已完成 ✓" : "标记完成";
             _doneBtn.Invalidate();
+            if (_planBtn != null)
+            {
+                string t = PlanText();
+                if (t != _planBtn.Text) { _planBtn.Text = t; _planBtn.Invalidate(); }
+            }
             Invalidate();
+        }
+
+        // ---------------------------------------------------------------- 每日步骤
+        public bool HasPlanSteps
+        {
+            get
+            {
+                foreach (var s in _planSteps) if (!s.Head) return true;
+                return false;
+            }
+        }
+
+        int PlanStepTotal
+        {
+            get { int n = 0; foreach (var s in _planSteps) if (!s.Head) n++; return n; }
+        }
+
+        string PlanText()
+        {
+            if (!HasPlanSteps || SlotIndex < 0) return "今天这几步怎么做 ▸";
+            int done = Store.PlanStepCount(Date.ToString("yyyy-MM-dd"), SlotIndex, _planSteps.Count);
+            if (done <= 0) return "今天这几步怎么做 ▸";
+            if (done >= PlanStepTotal) return "今天这几步怎么做 ✓ 全部完成";
+            return "今天这几步怎么做 " + done + "/" + PlanStepTotal + " ▸";
         }
 
         int LayoutPills(int width)
@@ -826,9 +877,9 @@ namespace StudyCompanion
                 }
                 else
                 {
-                    foreach (var s in dp.Slots)
+                    for (int si = 0; si < dp.Slots.Count; si++)
                     {
-                        var card = new SlotCard(_viewDate, s);
+                        var card = new SlotCard(_viewDate, dp.Slots[si], si);
                         card.Tag = "card";
                         card.Changed += delegate { RefreshLight(); };
                         _leftScroll.Controls.Add(card);
@@ -900,6 +951,9 @@ namespace StudyCompanion
                 _header.Invalidate();
             }
         }
+
+        /// <summary>给「网络代理」窗口用：代理刚配好，直接进同步界面</summary>
+        public void SyncNow() { OpenGitHub(); }
 
         /// <summary>
         /// 登录了但用户名是空的（旧版本保存时漏了）—— 后台补拉一次，顶栏就能显示名字。

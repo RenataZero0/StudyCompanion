@@ -47,6 +47,7 @@ public class MainActivity extends Activity implements MainView.Listener {
         Ui.S = getResources().getDisplayMetrics().density;
         ScheduleData.load(this);
         Store.init(this);
+        GitHub.refreshProxy(this);   // 用户填的代理要在发第一个请求之前生效
         Reminder.ensureChannel(this);
 
         FrameLayout root = new FrameLayout(this);
@@ -763,6 +764,64 @@ public class MainActivity extends Activity implements MainView.Listener {
         GitHub.logout(this);
         toast("已退出登录");
         if (view != null) view.invalidate();
+    }
+
+    // ------------------------------------------------------------------ 网络代理
+    /**
+     * 让用户填代理。程序自己不能翻墙，只能把你已经有的代理（Clash / v2ray 之类）填进来，
+     * 之后所有访问 GitHub 的请求都从那儿走 —— 这就是「平板没代理连不上 GitHub」的答案。
+     */
+    @Override
+    public void editProxy() {
+        final android.widget.EditText box = new android.widget.EditText(this);
+        box.setSingleLine(true);
+        box.setHint("127.0.0.1:7890");
+        box.setText(Store.proxy());
+        box.setSelectAllOnFocus(true);
+
+        int pad = Ui.px(16);
+        FrameLayout wrap = new FrameLayout(this);
+        wrap.setPadding(pad, pad / 2, pad, 0);
+        wrap.addView(box, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle("网络代理")
+                .setView(wrap)
+                .setMessage("程序自己不能翻墙，只能填你已经在用的代理。\n"
+                        + "格式：主机:端口，例如 127.0.0.1:7890；留空 = 不用代理。\n\n"
+                        + "平板没装代理？在电脑上开 Clash，勾上「允许局域网连接」，"
+                        + "这里填那台电脑的 IP，例如 192.168.1.5:7890。")
+                .setPositiveButton("保存", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        String raw = box.getText().toString();
+                        String norm = Store.normalizeProxy(raw);
+                        if (raw.trim().length() > 0 && norm.length() == 0) {
+                            simple("格式不对", "应该像 127.0.0.1:7890 这样（要带端口号）。");
+                            return;
+                        }
+                        Store.setProxy(norm);
+                        GitHub.refreshProxy(MainActivity.this);
+                        if (view != null) view.invalidate();
+                        toast(norm.length() == 0 ? "已清除代理" : "已设置代理：" + norm);
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle("代理已保存")
+                                .setMessage("要现在试着同步一次吗？")
+                                .setPositiveButton("立即同步", new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface d2, int w2) { ghSync(); }
+                                })
+                                .setNegativeButton("以后再说", null).show();
+                    }
+                })
+                .setNeutralButton("清除", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        Store.setProxy("");
+                        GitHub.refreshProxy(MainActivity.this);
+                        if (view != null) view.invalidate();
+                        toast("已清除代理");
+                    }
+                })
+                .setNegativeButton("取消", null).show();
     }
 
     // ================================================================== 同步

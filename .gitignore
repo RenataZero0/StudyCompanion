@@ -24,6 +24,7 @@ StudyCompanionAndroid/assets/daycache.tsv
 StudyCompanion/selftest.txt
 StudyCompanion/closetest.txt
 StudyCompanion/layouttest.txt
+StudyCompanion/plantest.txt
 StudyCompanion/_*.png
 StudyCompanion/_test/
 StudyCompanion/ghtest.exe
@@ -31,6 +32,10 @@ StudyCompanion/assetprobe.exe
 StudyCompanionAndroid/selftest.txt
 StudyCompanionAndroid/_*.png
 StudyCompanionAndroid/preview/phone-*.png
+
+# ---- 临时备份 ----
+*.bak
+*.bak-*
 
 # ---- 绿色版产物：Windows 只发安装版，这个不再入库 ----
 StudyCompanion/StudyCompanion.exe

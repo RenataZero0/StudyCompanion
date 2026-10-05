@@ -18,6 +18,7 @@ namespace StudyCompanion
         readonly Label _status = new Label();
         readonly Label _log = new Label();
         readonly Panel _buttons = new Panel();
+        readonly Label _proxy = new Label();
         readonly System.Windows.Forms.Timer _busy = new System.Windows.Forms.Timer();
 
         bool _working;
@@ -31,7 +32,7 @@ namespace StudyCompanion
             MaximizeBox = false;
             MinimizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(Ui.Px(520), Ui.Px(330));
+            ClientSize = new Size(Ui.Px(520), Ui.Px(356));
             BackColor = Color.White;
             Font = Ui.F(9.5f);
             try { Icon = AppIcon.Get(32); } catch { }
@@ -67,9 +68,23 @@ namespace StudyCompanion
             _log.SetBounds(Ui.Px(24), Ui.Px(124), Ui.Px(472), Ui.Px(110));
             Controls.Add(_log);
 
-            _buttons.SetBounds(0, Ui.Px(244), Ui.Px(520), Ui.Px(60));
+            _buttons.SetBounds(0, Ui.Px(270), Ui.Px(520), Ui.Px(60));
             _buttons.BackColor = Color.White;
             Controls.Add(_buttons);
+
+            // 代理入口：内地直连 github.com 基本不通，连不上时用户得能自己配一个
+            _proxy = new Label();
+            _proxy.Font = Ui.F(9f);
+            _proxy.ForeColor = Ui.Accent;
+            _proxy.Cursor = Cursors.Hand;
+            _proxy.SetBounds(Ui.Px(24), Ui.Px(240), Ui.Px(472), Ui.Px(22));
+            _proxy.Click += delegate
+            {
+                using (var f = new ProxyForm()) f.ShowDialog(this);
+                RefreshProxy();
+            };
+            Controls.Add(_proxy);
+            RefreshProxy();
 
             var close = new Pill();
             close.Text = "关闭";
@@ -138,6 +153,14 @@ namespace StudyCompanion
             _log.ForeColor = Ui.Sub;
         }
 
+        void RefreshProxy()
+        {
+            string p = Store.Proxy;
+            _proxy.Text = p.Length == 0
+                ? "网络代理：未设置（连不上 GitHub 时点这里）▸"
+                : "网络代理：" + p + "  （点击修改）▸";
+        }
+
         void SetBusy(bool on)
         {
             _working = on;
@@ -152,6 +175,10 @@ namespace StudyCompanion
             string m = e.Message;
             if (m.Contains("SSL/TLS") || m.Contains("SSL/TLS 安全通道"))
                 m += "（TLS 握手失败，多为网络/代理问题）";
+            if (m.Contains("超时") || m.Contains("timed out") || m.Contains("无法连接")
+                || m.Contains("远程服务器") || m.Contains("no such host") || m.Contains("名称")
+                || m.Contains("network") || m.Contains("Network"))
+                m += "　→　如果是内地网络，先点下面的「网络代理」配一个。";
             return m;
         }
 

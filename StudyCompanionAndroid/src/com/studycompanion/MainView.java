@@ -28,6 +28,7 @@ public class MainView extends View {
         void ghLogout();
         void ghSync();
         void ghCheckUpdate();
+        void editProxy();
     }
 
     static class Hit {
@@ -38,10 +39,11 @@ public class MainView extends View {
         Hit(RectF src, int a, String s, int i) { r.set(src); action = a; arg = s; index = i; }
     }
 
+    static final int A_PLAN = 15, A_STEP = 16, A_PROXY = 17;
     static final int A_URL = 1, A_TOGGLE = 2, A_DAY = 3, A_MENU = 4, A_EXPORT = 5,
             A_IMPORT = 6, A_LOG = 7, A_TODAY = 8, A_CLOSE_MENU = 9, A_REMIND = 10,
             A_GH_LOGIN = 11, A_GH_LOGOUT = 12, A_GH_SYNC = 13, A_GH_UPDATE = 14,
-            A_OV_CAL = 21, A_OV_STATS = 22, A_OV_TOOLS = 23, A_OV_CLOSE = 24;
+            A_OV_CAL = 21, A_OV_STATS = 22, A_OV_TOOLS = 23, A_OV_CLOSE = 24, A_OV_PLAN = 25;
 
     private final Listener listener;
     private final List<Hit> hits = new ArrayList<Hit>();
@@ -61,6 +63,10 @@ public class MainView extends View {
     // ---- 手机端：日历 / 统计 / 设置 放独立页面，不占主界面 ----
     int overlay = 0;                 // 0=主界面 1=日历 2=统计 3=设置
     float ovScroll = 0, ovContentH = 0;
+    // 学习步骤浮层：当前展示哪个时段的哪些步骤
+    int planSlot = -1;
+    String planIso = "";
+    java.util.List<DailyPlan.Step> planSteps = null;
     float bottomH = 0;               // 底部按钮栏高度（仅手机端）
     private float ovDownY, ovDownScroll;
     private boolean ovDragging;
@@ -268,14 +274,29 @@ public class MainView extends View {
             case A_GH_UPDATE:
                 if (listener != null) listener.ghCheckUpdate();
                 break;
+            case A_PROXY:
+                if (listener != null) listener.editProxy();
+                break;
             case A_OV_CAL:
                 overlay = 1; ovScroll = 0; break;
             case A_OV_STATS:
                 overlay = 2; ovScroll = 0; break;
             case A_OV_TOOLS:
                 overlay = 3; ovScroll = 0; break;
+            case A_PLAN:
+                openPlan(h.index);
+                break;
+            case A_STEP: {
+                boolean now = !DailyPlan.done(getContext(), planIso, planSlot, h.index);
+                DailyPlan.setDone(getContext(), planIso, planSlot, h.index, now);
+                break;
+            }
+            case A_OV_PLAN:
+                overlay = 4; ovScroll = 0; break;
             case A_OV_CLOSE:
-                overlay = 0; ovScroll = 0; break;
+                overlay = 0; ovScroll = 0;
+                if (planSteps != null) { planSteps = null; planSlot = -1; }
+                break;
         }
         invalidate();
     }
@@ -310,6 +331,7 @@ public class MainView extends View {
         boolean twoCol = total >= Ui.px(720);
 
         // 手机端：日历 / 统计 / 设置 挪到独立页面，主界面只留今天的任务
+        if (overlay == 4) { drawPlanOverlay(c, W, H); return; }
         if (overlay != 0) { drawOverlay(c, W, H); return; }
         bottomH = twoCol ? 0 : Ui.px(54);
 
@@ -450,6 +472,115 @@ public class MainView extends View {
         Ui.roundRect(c, 0, barH - Ui.px(1), W, barH, 0, Ui.LINE);
     }
 
+    // ---------------------------------------------------------------- 学习步骤
+    private void openPlan(int slotIdx) {
+        ScheduleData.Slot s = currentSlot(slotIdx);
+        if (s == null) return;
+        planSlot = slotIdx;
+        planIso = viewIso;
+        planSteps = DailyPlan.steps(getContext(), s);
+        overlay = 4;
+        ovScroll = 0;
+        invalidate();
+    }
+
+    private void drawPlanOverlay(Canvas c, float W, float H) {
+        c.drawColor(Ui.BG);
+        float barH = Ui.px(56);
+        float pad = Ui.px(14);
+        float w = W - pad * 2;
+        ScheduleData.Slot s = currentSlot(planSlot);
+
+        c.save();
+        c.clipRect(0, barH, W, H);
+        hitOffset = barH - ovScroll;
+        c.translate(0, hitOffset);
+        float y = drawPlanList(c, pad, w, Ui.px(14), s);
+        ovContentH = y + Ui.px(30);
+        c.restore();
+
+        clampOv();
+
+        Ui.roundRect(c, 0, 0, W, barH, 0, 0xFFFFFFFF);
+        Ui.text(c, "学习步骤", Ui.px(20), Ui.px(36), Ui.font(17, true, Ui.INK));
+        RectF close = new RectF(W - Ui.px(16) - Ui.px(78), Ui.px(13), W - Ui.px(16), Ui.px(43));
+        Ui.roundRect(c, close, Ui.px(15), Ui.ACCENT);
+        Ui.textC(c, "关闭", close, Ui.font(13, true, 0xFFFFFFFF));
+        hitOffset = 0;
+        hit(close, A_OV_CLOSE, null, 0);
+        Ui.roundRect(c, 0, barH - Ui.px(1), W, barH, 0, Ui.LINE);
+    }
+
+    private float drawPlanList(Canvas c, float pad, float w, float y, ScheduleData.Slot s) {
+        if (s == null || planSteps == null || planSteps.isEmpty()) {
+            Ui.roundRect(c, pad, y, pad + w, y + Ui.px(70), Ui.px(14), Ui.CARD);
+            Ui.text(c, "这个时段没有可展开的步骤。", pad + Ui.px(16), y + Ui.px(40),
+                    Ui.font(13, false, Ui.SUB));
+            return y + Ui.px(80);
+        }
+
+        int total = 0, doneN = 0;
+        for (int i = 0; i < planSteps.size(); i++) {
+            if (planSteps.get(i).head) continue;
+            total++;
+            if (DailyPlan.done(getContext(), planIso, planSlot, i)) doneN++;
+        }
+
+        float headH = Ui.px(80);
+        Ui.roundRect(c, pad, y, pad + w, y + headH, Ui.px(14), Ui.CARD);
+        Ui.roundStroke(c, new RectF(pad, y, pad + w, y + headH), Ui.px(14), Ui.LINE, 1f);
+        Ui.text(c, s.start + " – " + s.end + "　" + s.subject,
+                pad + Ui.px(16), y + Ui.px(30), Ui.font(15, true, Ui.INK));
+        Ui.text(c, "共 " + total + " 步，已完成 " + doneN + " 步",
+                pad + Ui.px(16), y + Ui.px(56),
+                Ui.font(12, true, (total > 0 && doneN >= total) ? Ui.GREEN : Ui.SUB));
+        y += headH + Ui.px(10);
+
+        Paint pT = Ui.font(13, false, Ui.TEXT_BODY);
+        Paint pNote = Ui.font(11, false, Ui.SUB);
+        float textW = w - Ui.px(16 + 30 + 16);
+
+        for (int i = 0; i < planSteps.size(); i++) {
+            DailyPlan.Step st = planSteps.get(i);
+            if (st.head) continue;
+
+            java.util.List<String> tl = Ui.wrap(pT, st.text, textW);
+            java.util.List<String> nl = st.note.length() == 0
+                    ? new java.util.ArrayList<String>() : Ui.wrap(pNote, st.note, textW);
+            float lh = Ui.px(20), nlh = Ui.px(16);
+            float rh = Ui.px(40) + tl.size() * lh
+                    + (nl.isEmpty() ? 0 : nl.size() * nlh + Ui.px(6)) + Ui.px(10);
+
+            boolean ok = DailyPlan.done(getContext(), planIso, planSlot, i);
+            Ui.roundRect(c, pad, y, pad + w, y + rh, Ui.px(12), ok ? Ui.GREEN_SOFT : Ui.CARD);
+            Ui.roundStroke(c, new RectF(pad, y, pad + w, y + rh), Ui.px(12),
+                    ok ? Ui.GREEN_LINE : Ui.LINE, 1f);
+
+            float bx = pad + Ui.px(14), by = y + Ui.px(12);
+            RectF boxr = new RectF(bx, by, bx + Ui.px(20), by + Ui.px(20));
+            if (ok) {
+                Ui.roundRect(c, boxr, Ui.px(6), Ui.GREEN);
+                Ui.textC(c, "\u2713", boxr, Ui.font(13, true, 0xFFFFFFFF));
+            } else {
+                Ui.roundStroke(c, boxr, Ui.px(6), Ui.LINE, 1.5f);
+            }
+            hit(new RectF(pad, y, pad + w, y + rh), A_STEP, null, i);
+
+            float tx = bx + Ui.px(30);
+            Ui.text(c, st.time + "　" + st.minutes + "\u2032", tx, y + Ui.px(24),
+                    Ui.font(11, true, Ui.ACCENT));
+            for (int k = 0; k < tl.size(); k++) {
+                Ui.text(c, tl.get(k), tx, y + Ui.px(44) + k * lh, pT);
+            }
+            float ny = y + Ui.px(44) + tl.size() * lh;
+            for (int k = 0; k < nl.size(); k++) {
+                Ui.text(c, nl.get(k), tx, ny + Ui.px(14) + k * nlh, pNote);
+            }
+            y += rh + Ui.px(8);
+        }
+        return y + Ui.px(10);
+    }
+
     // ---------------------------------------------------------------- 顶部
     private void drawHeader(Canvas c, float W) {
         Ui.roundRect(c, 0, 0, W, headerH, 0, 0xFFFFFFFF);
@@ -569,6 +700,7 @@ public class MainView extends View {
         if (titleH > 0) h += Ui.px(12) + titleH;
         if (book.length() > 0) h += Ui.px(23);
         h += Math.max(0, s.body.size() - 1) * Ui.px(20);
+        h += Ui.px(38);   // 「今天这几步怎么做」按钮
         if (!links.isEmpty()) h += pillY + Ui.px(10);
         h += Ui.px(14);
 
@@ -631,6 +763,18 @@ public class MainView extends View {
         for (int i = 1; i < s.body.size(); i++) {
             Ui.text(c, Ui.ellipsize(pD, s.body.get(i), w - Ui.px(34)), x, cy + Ui.px(14), pD);
             cy += Ui.px(20);
+        }
+
+        // 「学习步骤」——把这一时段展开成可以照着做的傻瓜步骤
+        {
+            Paint pPlan = Ui.font(12, true, Ui.ACCENT);
+            String planTxt = "今天这几步怎么做 ▸";
+            float planW = pPlan.measureText(planTxt) + Ui.px(26);
+            RectF planR = new RectF(x, cy + Ui.px(6), x + planW, cy + Ui.px(34));
+            Ui.roundRect(c, planR, Ui.px(14), Ui.ACCENT_SOFT);
+            Ui.textC(c, planTxt, planR, pPlan);
+            hit(planR, A_PLAN, null, idx);
+            cy += Ui.px(38);
         }
 
         // 链接胶囊
@@ -781,6 +925,13 @@ public class MainView extends View {
             gs.add(new String[]{"GitHub 同步", "立即同步", "退出登录",
                     "\u0001已登录：" + GitHub.user(getContext())});
         }
+
+        // 内地不开代理连不上 GitHub。程序自己不能翻墙，只能让用户把已有的代理填进来。
+        String px = Store.proxy();
+        gs.add(new String[]{"网络代理", "网络代理",
+                "\u0001" + (px.length() == 0
+                        ? "未设置：连不上 GitHub 时点这里，填你已有的代理（如 127.0.0.1:7890）"
+                        : "已设置：" + px + "（点这里可改）")});
         return gs;
     }
 
@@ -850,6 +1001,7 @@ public class MainView extends View {
                 else if ("立即同步".equals(label)) action = A_GH_SYNC;
                 else if ("检查更新".equals(label)) action = A_GH_UPDATE;
                 else if ("退出登录".equals(label)) action = A_GH_LOGOUT;
+                else if ("网络代理".equals(label)) action = A_PROXY;
                 hit(r, action, null, 0);
                 bx += bw + Ui.px(8);
             }

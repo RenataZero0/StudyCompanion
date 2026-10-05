@@ -49,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.1.15";
+        public const string VersionTag = "v2.1.16";
 
         public const string SyncPath = "sync/progress.txt";
         /// <summary>打卡记录的 CSV 也会自动传到这里，不用手动导出</summary>
@@ -223,6 +223,24 @@ namespace StudyCompanion
         }
 
         // ============================================================== HTTP
+        /// <summary>
+        /// 给请求套上用户在「设置与工具」里填的代理。
+        /// 填了就用它，没填就保持 .NET 默认（读系统代理设置）。
+        /// </summary>
+        public static void ApplyProxy(HttpWebRequest r)
+        {
+            try
+            {
+                string p = Store.Proxy;
+                if (p.Length == 0) return;
+                r.Proxy = new WebProxy("http://" + p, false);
+            }
+            catch { }
+        }
+
+        /// <summary>当前配的代理（给界面显示用），没配就返回空串</summary>
+        public static string ProxyLabel { get { return Store.Proxy; } }
+
         static HttpWebRequest Req(string method, string url, string token, string accept)
         {
             // 令牌可能快过期了，先用 refresh_token 续一下再发请求。
@@ -236,6 +254,7 @@ namespace StudyCompanion
             r.UserAgent = "StudyCompanion-Windows";
             r.Accept = accept;
             r.AllowAutoRedirect = true;
+            ApplyProxy(r);
             if (!string.IsNullOrEmpty(token)) r.Headers["Authorization"] = "Bearer " + token;
             return r;
         }
@@ -368,10 +387,36 @@ namespace StudyCompanion
                 if (!ex.Message.StartsWith("HTTP 401", StringComparison.Ordinal)) throw;
 
                 var d = ApiWith(method, path, jsonBody, null);
-                try { Logout(); } catch { }
-                try { MainForm.NotifyHeaderChanged(); } catch { }
-                try { if (AuthLost != null) AuthLost(); } catch { }
+
+                // 401 不等于令牌废了 —— 可能只是这一次请求被挡（网络抖动、代理、限流、
+                // 或者 GitHub 偶发抽风）。以前这里无条件 Logout()，导致偶发 401 就要重新授权。
+                // 现在明确探一次 /user：只有它也 401，才认定令牌真的失效。
+                if (TokenLooksDead())
+                {
+                    try { Logout(); } catch { }
+                    try { MainForm.NotifyHeaderChanged(); } catch { }
+                    try { if (AuthLost != null) AuthLost(); } catch { }
+                }
                 return d;
+            }
+        }
+
+        /// <summary>
+        /// 令牌是不是真的废了。只有 /user 明确回 401 才算；
+        /// 网络错误、超时、5xx 一律当作「探不出来」，保留令牌别乱删。
+        /// </summary>
+        static bool TokenLooksDead()
+        {
+            string tok = Token;
+            if (string.IsNullOrEmpty(tok)) return true;
+            try
+            {
+                ApiWith("GET", "/user", null, tok);
+                return false;                       // 能读到用户信息 = 令牌好好的
+            }
+            catch (Exception e)
+            {
+                return e.Message.StartsWith("HTTP 401", StringComparison.Ordinal);
             }
         }
 

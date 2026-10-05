@@ -221,7 +221,47 @@ namespace StudyCompanion
             return mins / 60.0;
         }
 
-        public static int TotalDoneSlots() { return _done.Count; }
+        /// <summary>
+        /// 「日期|时段」这种真正的打卡键。
+        /// progress.tsv 里还混着「每日步骤」的勾选（plan|日期|时段|步号），统计时要排除掉。
+        /// </summary>
+        static bool IsSlotKey(string k)
+        {
+            return k.Length > 11 && k[4] == '-' && k[7] == '-' && k[10] == '|';
+        }
+
+        public static int TotalDoneSlots()
+        {
+            int n = 0;
+            foreach (var k in _done) if (IsSlotKey(k)) n++;
+            return n;
+        }
+
+        // ------------------------------------------------------------------ 每日步骤的勾选
+        static string PlanKey(string iso, int slot, int idx)
+        {
+            return "plan|" + iso + "|" + slot + "|" + idx;
+        }
+
+        public static bool PlanStepDone(string iso, int slot, int idx)
+        {
+            return _done.Contains(PlanKey(iso, slot, idx));
+        }
+
+        public static void SetPlanStep(string iso, int slot, int idx, bool v)
+        {
+            string k = PlanKey(iso, slot, idx);
+            bool changed = v ? _done.Add(k) : _done.Remove(k);
+            if (changed) Save();
+        }
+
+        /// <summary>某天某时段一共勾了几步</summary>
+        public static int PlanStepCount(string iso, int slot, int total)
+        {
+            int n = 0;
+            for (int i = 0; i < total; i++) if (PlanStepDone(iso, slot, i)) n++;
+            return n;
+        }
 
         /// <summary>本周（周一–周日）已完成的时段数 / 总时段数</summary>
         public static void WeekProgress(out int done, out int total)
@@ -366,6 +406,36 @@ namespace StudyCompanion
         {
             get { return GetSetting("CloseToTray", "1") != "0"; }
             set { SetSetting("CloseToTray", value ? "1" : "0"); }
+        }
+
+        /// <summary>
+        /// 访问 GitHub 时走的代理，形如 "127.0.0.1:7890"（留空 = 不用代理，走系统默认）。
+        /// 中国大陆没开代理时连不上 GitHub，这里让用户自己填一个能用的。
+        /// </summary>
+        public static string Proxy
+        {
+            get { return NormalizeProxy(GetSetting("Proxy", "")); }
+            set { SetSetting("Proxy", NormalizeProxy(value)); }
+        }
+
+        /// <summary>把用户填的各种写法统一成 "host:port"；认不出来就返回空串（等于不用代理）</summary>
+        public static string NormalizeProxy(string s)
+        {
+            if (s == null) return "";
+            s = s.Trim();
+            if (s.Length == 0) return "";
+            // 允许 http://host:port、host:port、host：port（中文冒号）
+            s = s.Replace("：", ":");
+            if (s.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) s = s.Substring(7);
+            if (s.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) s = s.Substring(8);
+            s = s.TrimEnd('/');
+            int c = s.LastIndexOf(':');
+            if (c <= 0 || c == s.Length - 1) return "";
+            int port;
+            if (!int.TryParse(s.Substring(c + 1), out port) || port <= 0 || port > 65535) return "";
+            string host = s.Substring(0, c).Trim();
+            if (host.Length == 0) return "";
+            return host + ":" + port;
         }
 
         public static string GetSetting(string key, string def)

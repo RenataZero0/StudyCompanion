@@ -111,7 +111,46 @@ public class Store {
         return min / 60.0;
     }
 
-    public static int totalDone() { return sp.getStringSet("done", new HashSet<String>()).size(); }
+    public static int totalDone() {
+        Set<String> all = sp.getStringSet("done", new HashSet<String>());
+        int n = 0;
+        for (String k : all) if (isSlotKey(k)) n++;   // 「plan|…」是步骤勾选，不算时段
+        return n;
+    }
+
+    /** 时段 key 形如 2026-10-05|14:00-15:00；步骤 key 以 plan| 开头，得排除掉 */
+    static boolean isSlotKey(String k) {
+        return k.length() > 11 && k.charAt(4) == '-' && k.charAt(7) == '-' && k.charAt(10) == '|';
+    }
+
+    // ------------------------------------------------------------------ 设置
+    /**
+     * 访问 GitHub 时走的代理，形如 "127.0.0.1:7890"；空串 = 不用代理。
+     * 内地不开代理连不上 GitHub，这个值让用户在「设置与工具」里自己填。
+     */
+    public static String proxy() { return sp.getString("proxy", ""); }
+
+    public static void setProxy(String v) { sp.edit().putString("proxy", normalizeProxy(v)).apply(); }
+
+    /** 把 http://host:port、host：port 之类的写法统一成 host:port；认不出来就返回空串 */
+    public static String normalizeProxy(String s) {
+        if (s == null) return "";
+        s = s.trim().replace("：", ":");
+        if (s.length() == 0) return "";
+        String low = s.toLowerCase();
+        if (low.startsWith("http://")) s = s.substring(7);
+        else if (low.startsWith("https://")) s = s.substring(8);
+        while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        int i = s.lastIndexOf(':');
+        if (i <= 0 || i == s.length() - 1) return "";
+        String host = s.substring(0, i).trim();
+        if (host.length() == 0) return "";
+        try {
+            int port = Integer.parseInt(s.substring(i + 1));
+            if (port <= 0 || port > 65535) return "";
+            return host + ":" + port;
+        } catch (Exception e) { return ""; }
+    }
 
     /** 本周（周一–周日）完成 / 总数 */
     public static int[] weekProgress() {

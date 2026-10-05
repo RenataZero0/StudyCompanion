@@ -47,6 +47,23 @@ if (Test-Path $cl) {
     Write-Host "changelog: copied from repo root"
 }
 
+# The three tables behind "今天这几步怎么做" are shared with the Windows app.
+# Copy them in so the two ends can never drift apart.
+#
+# NOTE: they must sit directly under assets\, NOT in a subfolder. aapt2 on Windows
+# writes nested asset names with a backslash ("assets/plan\exercises.tsv"), which
+# AssetManager.open("plan/exercises.tsv") can never find.
+$planSrc = Join-Path $here "..\StudyCompanion\data\plan"
+$assetDst = Join-Path $here "assets"
+if (-not (Test-Path $planSrc)) { throw "missing plan tables: $planSrc" }
+New-Item -ItemType Directory -Force $assetDst | Out-Null
+foreach ($n in @("exercises.tsv", "checks.tsv", "books.tsv")) {
+    $s = Join-Path $planSrc $n
+    if (-not (Test-Path $s)) { throw "missing plan table: $s" }
+    Copy-Item $s (Join-Path $assetDst $n) -Force
+}
+Write-Host "plan tables: copied from ..\StudyCompanion\data\plan"
+
 $out = "$here\build"
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
 New-Item -ItemType Directory -Force "$out\gen", "$out\classes", "$out\dex" | Out-Null

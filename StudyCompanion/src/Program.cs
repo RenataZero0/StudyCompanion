@@ -17,8 +17,8 @@ namespace StudyCompanion
         [STAThread]
         static void Main(string[] args)
         {
-            bool selftest = false, testtoast = false, tray = false, layoutTest = false, closeTest = false;
-            string shot = null, shotDate = null, mdFile = null;
+            bool selftest = false, testtoast = false, tray = false, layoutTest = false, closeTest = false, planTest = false;
+            string shot = null, shotDate = null, mdFile = null, dlgShot = null, dlgName = null;
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -27,6 +27,8 @@ namespace StudyCompanion
                 else if (a == "--tray") tray = true;
                 else if (a == "--layouttest") layoutTest = true;
                 else if (a == "--closetest") closeTest = true;
+                else if (a == "--plantest") planTest = true;
+                else if (a == "--dlgshot" && i + 2 < args.Length) { dlgName = args[i + 1]; dlgShot = args[i + 2]; i += 2; }
                 else if (a == "--shot" && i + 1 < args.Length) shot = args[i + 1];
                 else if (a == "--date" && i + 1 < args.Length) shotDate = args[i + 1];
                 else if (a == "--md" && i + 1 < args.Length) mdFile = args[i + 1];
@@ -49,6 +51,10 @@ namespace StudyCompanion
             if (closeTest) { CloseTest(); return; }
 
             if (layoutTest) { LayoutTest(); return; }
+
+            if (planTest) { PlanTest(shotDate); return; }
+
+            if (dlgShot != null) { DialogShot(dlgName, dlgShot); return; }
 
             if (shot != null) { Snapshot(shot, shotDate, mdFile); return; }
 
@@ -359,6 +365,118 @@ namespace StudyCompanion
             f.ForceClose = true;
             f.Close();
             Console.WriteLine("layouttest done");
+        }
+
+        // --------------------------------------------------- 每日步骤清单自检
+        /// <summary>
+        /// 把「今天这几步怎么做」的生成结果全量跑一遍（不依赖界面），
+        /// 校验每个时段的时间轴是否恰好填满，结果写到 plantest.txt。
+        /// </summary>
+        static void PlanTest(string dateArg)
+        {
+            DailyPlan.Load();
+            ScheduleData.Load();
+            var log = new StringBuilder();
+            log.AppendLine("DailyPlan 自检");
+            log.AppendLine("数据来源：" + DailyPlan.LoadNote);
+            log.AppendLine();
+
+            DateTime only = DateTime.MinValue;
+            if (!string.IsNullOrEmpty(dateArg))
+                DateTime.TryParse(dateArg, out only);
+
+            int slots = 0, bad = 0, noPlan = 0;
+            var samples = new List<string>();
+
+            foreach (var d in ScheduleData.AllDates)
+            {
+                if (only != DateTime.MinValue && d.Date != only.Date) continue;
+                var dp = ScheduleData.GetDay(d);
+                if (dp == null) continue;
+                for (int si = 0; si < dp.Slots.Count; si++)
+                {
+                    var s = dp.Slots[si];
+                    slots++;
+                    var steps = DailyPlan.Steps(s);
+                    if (steps.Count == 0 || !HasPlan(steps)) { noPlan++; continue; }
+
+                    // 时间轴必须正好填满该时段
+                    int sum = 0;
+                    foreach (var st in steps) if (!st.Head) sum += Math.Max(3, st.Minutes);
+                    bool ok = sum == s.DurationMinutes;
+                    if (!ok) bad++;
+
+                    if (samples.Count < 3 || !ok)
+                    {
+                        var sb = new StringBuilder();
+                        sb.AppendLine("### " + s.Start + "-" + s.End + "  " + s.Subject
+                            + "   时长 " + s.DurationMinutes + "′  合计 " + sum + "′  "
+                            + (ok ? "OK" : "不匹配 ✗"));
+                        foreach (var st in steps)
+                        {
+                            if (st.Head) sb.AppendLine("  [" + st.Text + "]");
+                            else sb.AppendLine("  " + st.Time + " (" + st.Minutes + "′) " + st.Text
+                                + (st.Note.Length > 0 ? "\n        . " + st.Note : ""));
+                        }
+                        if (samples.Count < 3) samples.Add(sb.ToString());
+                        else log.AppendLine(sb.ToString());
+                    }
+                }
+            }
+
+            foreach (var t in samples) log.AppendLine(t);
+            log.AppendLine();
+            log.AppendLine("时段总数 = " + slots + "，其中无步骤 = " + noPlan
+                + "，时间轴不匹配 = " + bad);
+
+            File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plantest.txt"),
+                log.ToString(), new UTF8Encoding(true));
+            Console.WriteLine("plantest -> " + Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plantest.txt"));
+        }
+
+        static bool HasPlan(List<DailyPlan.Step> steps)
+        {
+            foreach (var s in steps) if (!s.Head) return true;
+            return false;
+        }
+
+        // --------------------------------------------------- 对话框离屏截图
+        /// <summary>
+        /// 把某个对话框离屏渲染成 PNG，用来核对排版（不弹到用户屏幕上）。
+        /// 用法：--dlgshot proxy|github|plan 输出.png
+        /// </summary>
+        static void DialogShot(string name, string path)
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            Form f;
+            if (name == "proxy") f = new ProxyForm();
+            else if (name == "github") f = new GitHubForm();
+            else if (name == "plan")
+            {
+                ScheduleData.Load();
+                DateTime d = ScheduleData.FirstDate;
+                var dp = ScheduleData.GetDay(d);
+                if (dp == null || dp.Slots.Count == 0) { Console.WriteLine("没有找到当天安排"); return; }
+                f = new PlanForm(d, dp.Slots[0], 0);
+            }
+            else { Console.WriteLine("未知对话框：" + name); return; }
+
+            f.StartPosition = FormStartPosition.Manual;
+            f.Location = new Point(-6000, -6000);
+            f.ShowInTaskbar = false;
+            f.Show();
+            Application.DoEvents();
+            // 按「整个窗口」的尺寸来截：DrawToBitmap 会把标题栏也画进去，
+            // 只用 ClientSize 的话底部会被裁掉一角（看上去像排版出问题）。
+            using (var bmp = new Bitmap(f.Width, f.Height))
+            {
+                f.DrawToBitmap(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height));
+                bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            }
+            f.Close();
+            Console.WriteLine("dlgshot -> " + path);
         }
 
         // ------------------------------------------------------------------ 自检

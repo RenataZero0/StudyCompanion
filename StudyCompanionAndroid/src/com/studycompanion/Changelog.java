@@ -64,12 +64,11 @@ public class Changelog {
     public static boolean fetch(Context c, String[] err) {
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(URL).openConnection();
+            conn = GitHub.open(URL);
             conn.setConnectTimeout(TIMEOUT);
             conn.setReadTimeout(TIMEOUT);
             conn.setRequestProperty("User-Agent", "StudyCompanion-Android");
             conn.setRequestProperty("Cache-Control", "no-cache");
-            GitHub.applyTls(conn);
 
             int code = conn.getResponseCode();
             if (code < 200 || code >= 300) {
