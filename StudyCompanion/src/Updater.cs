@@ -51,7 +51,7 @@ namespace StudyCompanion
                 if (rel == null || string.IsNullOrEmpty(rel.Tag)) return;
                 // 远端不比本机新就什么都不做（之前用 equals，降级也会被当成升级）
                 if (CompareVersion(rel.Tag, GitHub.VersionTag) <= 0) return;
-                if (string.IsNullOrEmpty(rel.ExeDownload(GitHub.LoggedIn))) return;
+                if (string.IsNullOrEmpty(rel.WinDownload(GitHub.LoggedIn))) return;
 
                 Post(delegate { Prompt(rel); });
             }
@@ -158,23 +158,70 @@ namespace StudyCompanion
             }
         }
 
-        /// <summary>下载新 exe 并替换自己、重启</summary>
+        /// <summary>
+        /// 下载更新包并装上、重启。
+        ///
+        /// 现在发的是安装程序（绿色版不再发布），所以走「静默安装」；
+        /// 万一碰上老 Release 只有裸 exe，再退回原来的批处理替换。
+        /// </summary>
         public static void DownloadAndReplace(GitHub.Release rel, IWin32Window owner)
         {
-            string tmp = Path.Combine(Path.GetTempPath(), "StudyCompanion-" + rel.Tag + ".exe");
+            string url = rel.WinDownload(GitHub.LoggedIn);
+            bool setup = rel.IsSetup(url);
+
+            string tmp = Path.Combine(Path.GetTempPath(),
+                setup ? "StudyCompanion-Setup-" + rel.Tag + ".exe"
+                      : "StudyCompanion-" + rel.Tag + ".exe");
             try
             {
                 if (File.Exists(tmp)) File.Delete(tmp);
-                GitHub.Download(rel.ExeDownload(GitHub.LoggedIn), tmp, null);
+                GitHub.Download(url, tmp, null);
                 var ok = MessageBox.Show(owner,
-                    "已下载到：\n" + tmp + "\n\n点「确定」后程序会退出，自动替换并重启。",
+                    "已下载到：\n" + tmp + "\n\n点「确定」后程序会退出，"
+                    + (setup ? "自动安装并重启。" : "自动替换并重启。"),
                     "下载完成", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
                 if (ok != DialogResult.OK) return;
-                ReplaceSelf(tmp, owner);
+                if (setup) RunSetupAndRestart(tmp, owner);
+                else ReplaceSelf(tmp, owner);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(owner, "下载失败\n\n" + GitHub.Friendly(ex), "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// 程序还开着的时候安装包盖不掉它，所以写个批处理：
+        /// 等本进程退出 → 静默安装 → 重新启动。
+        ///
+        /// 和 ReplaceSelf 一样，批处理必须用系统 ANSI 写 ——
+        /// cmd.exe 是按 ANSI 读 .bat 的，用 UTF-8 写会把路径里的中文变成乱码。
+        /// </summary>
+        public static void RunSetupAndRestart(string setup, IWin32Window owner)
+        {
+            try
+            {
+                string self = Application.ExecutablePath;
+                string bat = Path.Combine(Path.GetTempPath(), "sc-update.bat");
+                var sb = new StringBuilder();
+                sb.AppendLine("@echo off");
+                sb.AppendLine("ping 127.0.0.1 -n 3 > nul");
+                sb.AppendLine("\"" + setup + "\" --silent");
+                sb.AppendLine("start \"\" \"" + self + "\"");
+                sb.AppendLine("del \"" + setup + "\" > nul 2>&1");
+                sb.AppendLine("del \"%~f0\" > nul 2>&1");
+                File.WriteAllText(bat, sb.ToString(), Encoding.Default);
+
+                var psi = new ProcessStartInfo("cmd.exe", "/c \"" + bat + "\"");
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                psi.UseShellExecute = true;
+                Process.Start(psi);
+                MainForm.ForceQuit();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(owner, "启动安装程序失败\n\n" + GitHub.Friendly(ex),
+                    "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

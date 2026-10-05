@@ -32,6 +32,9 @@ StudyCompanionAndroid/selftest.txt
 StudyCompanionAndroid/_*.png
 StudyCompanionAndroid/preview/phone-*.png
 
+# ---- 绿色版产物：Windows 只发安装版，这个不再入库 ----
+StudyCompanion/StudyCompanion.exe
+
 # ---- 生成物（唯一来源是仓库根目录的 CHANGELOG.md）----
 StudyCompanion/CHANGELOG.md
 StudyCompanionAndroid/assets/CHANGELOG.md

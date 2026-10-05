@@ -49,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.1.13";
+        public const string VersionTag = "v2.1.14";
 
         public const string SyncPath = "sync/progress.txt";
         /// <summary>打卡记录的 CSV 也会自动传到这里，不用手动导出</summary>
@@ -397,12 +397,38 @@ namespace StudyCompanion
             public string ApkBrowser = "", ExeBrowser = "";
             public long ApkSize, ExeSize;
 
-            /// <summary>挑一个能用的下载地址</summary>
-            public string ExeDownload(bool loggedIn)
+            /// <summary>安装包。现在 Windows 只发这一个，不再发绿色版 exe</summary>
+            public string SetupUrl = "", SetupBrowser = "";
+            public long SetupSize;
+
+            /// <summary>
+            /// 挑一个能用的 Windows 更新包。
+            ///
+            /// 优先安装包 —— 绿色版已经不发布了。
+            /// 但老 Release 里只有裸 exe，所以留着兜底，免得旧版本升不上来。
+            /// </summary>
+            public string WinDownload(bool loggedIn)
             {
+                if (loggedIn && SetupUrl.Length > 0) return SetupUrl;
+                if (SetupBrowser.Length > 0) return SetupBrowser;
+                if (SetupUrl.Length > 0) return SetupUrl;
+
                 if (loggedIn && ExeUrl.Length > 0) return ExeUrl;
                 return ExeBrowser.Length > 0 ? ExeBrowser : ExeUrl;
             }
+
+            /// <summary>拿到的这个是安装程序吗（靠文件名判断，下载地址里带着 Setup）</summary>
+            public bool IsSetup(string url)
+            {
+                return !string.IsNullOrEmpty(url)
+                    && url.IndexOf("Setup", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+
+            /// <summary>更新包大小</summary>
+            public long WinSize { get { return SetupSize > 0 ? SetupSize : ExeSize; } }
+
+            /// <summary>旧名字，等价于 WinDownload</summary>
+            public string ExeDownload(bool loggedIn) { return WinDownload(loggedIn); }
         }
 
         public static Release LatestRelease()
@@ -431,6 +457,8 @@ namespace StudyCompanion
                         string br = Str(m, "browser_download_url");
                         if (n.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
                         { rel.ApkUrl = api; rel.ApkBrowser = br; rel.ApkSize = Long(m, "size"); }
+                        else if (n.Equals("StudyCompanion-Setup.exe", StringComparison.OrdinalIgnoreCase))
+                        { rel.SetupUrl = api; rel.SetupBrowser = br; rel.SetupSize = Long(m, "size"); }
                         else if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                         { rel.ExeUrl = api; rel.ExeBrowser = br; rel.ExeSize = Long(m, "size"); }
                     }
