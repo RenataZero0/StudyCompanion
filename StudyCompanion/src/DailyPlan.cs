@@ -26,6 +26,9 @@ namespace StudyCompanion
             public string Text = "";      // 主文本
             public string Note = "";      // 缩进的小字说明（可空，可含 \n）
             public bool Head;             // 「小节标题」这种不可勾选的提示行
+            public bool Fixed;            // 分钟数是课表原文里写死的，不许被 FitTail 改
+            public bool Untimed;          // 「合格线 / 说明」这种不定时的行：不显示分钟、时钟也不走
+            public string Raw = "";       // 原文（只有写了分钟数的行才填）——收尾后用它把正文里的数字改回来
         }
 
         class Ex
@@ -169,11 +172,39 @@ namespace StudyCompanion
             return ((total / 60) % 24).ToString("00") + ":" + (total % 60).ToString("00");
         }
 
+        /// <summary>
+        /// 这一行正文里自己写了多少分钟（「（30 分钟）」「20′」）。没写就返回 0。
+        /// 自检用它来确认「步骤上显示的分钟数」和「正文里写的」一致。
+        /// </summary>
+        public static int StatedMinutes(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            var m = MIN_RE.Match(text);
+            if (!m.Success) m = MIN2_RE.Match(text);
+            return m.Success ? ParseInt(m.Groups[1].Value) : 0;
+        }
+
+        /// <summary>把正文里那个分钟数换掉（跟 StatedMinutes 认的是同一处数字）。</summary>
+        public static string WithMinutes(string text, int mm)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            var g = MIN_RE.Match(text);
+            if (!g.Success) g = MIN2_RE.Match(text);
+            if (!g.Success) return text;
+            var d = g.Groups[1];
+            return text.Substring(0, d.Index) + mm.ToString() + text.Substring(d.Index + d.Length);
+        }
+
         // ------------------------------------------------------------------ 展开
         public static List<Step> Steps(Slot s)
         {
             var outp = StepsRaw(s);
             FitTail(outp, s);
+            // 收尾可能动过分钟数：凡是正文里写了时长的行，把正文里的数字同步成最终值，
+            // 这样「正文写（30 分钟）」和「步骤显示 25′」永远不会同时出现。
+            foreach (var st in outp)
+                if (!st.Head && !st.Untimed && st.Raw.Length > 0)
+                    st.Text = WithMinutes(st.Raw, st.Minutes);
             return outp;
         }
 
@@ -183,35 +214,70 @@ namespace StudyCompanion
         /// 这里统一收尾：多的补给最后一步，超的从最长的一步开始往下扣，谁也不许低于 MinMin。
         /// </summary>
         const int MinMin = 3;
+        // 收尾时的下限只保证「不是 0」：这里再用 3 分钟卡，
+        // 就会出现「把所有步骤顶到 3 分钟、只能回头去砍课表原文写死的数字」的荒唐结果。
+        const int MinTail = 1;
 
         static void FitTail(List<Step> outp, Slot s)
         {
             if (s == null || outp.Count == 0) return;
-            var idx = new List<int>();
+            var idx = new List<int>();        // 可以随便调的（时长是程序算出来的）
+            var all = new List<int>();        // 所有定时行（含课表原文里写死的）
             int sum = 0;
             for (int i = 0; i < outp.Count; i++)
             {
-                if (outp[i].Head) continue;
-                if (outp[i].Minutes < MinMin) outp[i].Minutes = MinMin;
+                if (outp[i].Head || outp[i].Untimed) continue;   // 提示行 / 不定时行不参与
+                if (outp[i].Minutes < MinTail) outp[i].Minutes = MinTail;
                 sum += outp[i].Minutes;
-                idx.Add(i);
+                all.Add(i);
+                if (!outp[i].Fixed) idx.Add(i);
             }
-            if (idx.Count == 0) return;
+            if (all.Count == 0) return;
+            // 实在没有「程序算出来的」行时，才允许动课表原文里的数字，
+            // 否则宁可让原文的数字保持原样。
+            if (idx.Count == 0) idx = all;
 
             int diff = s.DurationMinutes - sum;
             if (diff > 0)
             {
-                outp[idx[idx.Count - 1]].Minutes += diff;
+                int flex = 0;
+                for (int i = 0; i < idx.Count; i++) if (!outp[idx[i]].Fixed) flex++;
+                if (flex == 0)
+                {
+                    // 一个「程序算出来的」行都没有：只能加在最后一步上
+                    outp[idx[idx.Count - 1]].Minutes += diff;
+                    return;
+                }
+                // 富余的时间平摊给「程序算出来的」那些行，免得全堆在最后一步上
+                int each = diff / flex, rest = diff % flex;
+                for (int i = 0; i < idx.Count; i++)
+                {
+                    int k = idx[i];
+                    if (outp[k].Fixed) continue;
+                    outp[k].Minutes += each;
+                    if (rest > 0) { outp[k].Minutes += 1; rest--; }
+                }
                 return;
             }
             while (diff < 0)
             {
                 int best = -1;
+                // 先只从「程序算出来的」里挑最长的往下扣
                 for (int i = 0; i < idx.Count; i++)
                 {
                     int k = idx[i];
-                    if (outp[k].Minutes <= MinMin) continue;
+                    if (outp[k].Minutes <= MinTail || outp[k].Fixed) continue;
                     if (best < 0 || outp[k].Minutes > outp[best].Minutes) best = k;
+                }
+                // 实在没有，才退而求其次去动课表原文里写死的
+                if (best < 0)
+                {
+                    for (int i = 0; i < idx.Count; i++)
+                    {
+                        int k = idx[i];
+                        if (outp[k].Minutes <= MinTail) continue;
+                        if (best < 0 || outp[k].Minutes > outp[best].Minutes) best = k;
+                    }
                 }
                 if (best < 0) break;      // 已经全部到底，只能认了
                 outp[best].Minutes--;
@@ -343,32 +409,79 @@ namespace StudyCompanion
             if (det.Count == 0) return outp;
             outp.Add(Info(s.Subject));
 
-            var est2 = new int[det.Count];
-            int used = 0, blanks = 0;
+            // 课表原文里自己写了「（25 分钟）」「20′」的，那个数字就是作者定的，
+            // 必须原样照抄 —— 不能再平均分配、更不能被 FitTail 改掉，
+            // 否则会出现「正文写着（30 分钟），步骤上却显示 25′」这种自相矛盾。
+            var own = new int[det.Count];
+            var fromText = new bool[det.Count];
+            int fixedSum = 0, blanks = 0;
             for (int i = 0; i < det.Count; i++)
             {
                 // 先找「20′」这种写法，找不到再找「20分钟」。
                 // 注意：不能对同一个 Matcher 连着调两次 find()——第一次已经越过了那个数字。
                 var m = MIN_RE.Match(det[i]);
                 if (!m.Success) m = MIN2_RE.Match(det[i]);
-                est2[i] = m.Success ? ParseInt(m.Groups[1].Value) : 0;
-                if (est2[i] > 0) used += est2[i]; else blanks++;
+                own[i] = m.Success ? ParseInt(m.Groups[1].Value) : 0;
+                if (own[i] > 0) { fromText[i] = true; fixedSum += own[i]; }
+                else blanks++;
             }
-            if (blanks > 0)
+
+            // 原文写的时长加起来比时段本身还长（课表排得太满）：按比例缩小。
+            // 用 Floor 保证缩完不会又超出去；正文里的数字随后会跟着改成缩完的值。
+            if (fixedSum > total)
             {
-                int per = Math.Max(MinMin, (total - used) / blanks);
-                for (int i = 0; i < est2.Length; i++) if (est2[i] == 0) est2[i] = per;
+                double sc = total * 1.0 / fixedSum;
+                for (int i = 0; i < own.Length; i++)
+                    if (fromText[i]) own[i] = Math.Max(1, (int)Math.Floor(own[i] * sc));
+                fixedSum = 0; blanks = 0;
+                for (int i = 0; i < own.Length; i++)
+                    if (own[i] > 0) fixedSum += own[i]; else blanks++;
             }
-            else if (used == 0)
+
+            int slack = total - fixedSum;
+            if (blanks > 0 && slack > 0)
             {
+                // 剩下的时间平摊给没写时长的行。这些行的正文里本来就没有数字，
+                // 给多少都不会自相矛盾；但富余如果连 1 分钟都不够分，
+                // 就只能让排在后面的那几行改成不定时，不能超支。
+                int per = Math.Max(1, slack / blanks);
+                int given = 0;
+                for (int i = 0; i < own.Length; i++)
+                {
+                    if (own[i] != 0) continue;
+                    if (given + per > slack) continue;   // 余量不够了，这行改用不定时
+                    own[i] = per;
+                    given += per;
+                }
+            }
+            else if (fixedSum == 0)
+            {
+                // 一行都没写时长：按行数平分
                 int even = Math.Max(MinMin, total / Math.Max(1, det.Count));
-                for (int i = 0; i < est2.Length; i++) est2[i] = even;
+                for (int i = 0; i < own.Length; i++) own[i] = even;
             }
+            // 剩下的情况：作者写的时长已经把这个时段占满了。
+            // 那些没写时长的行是「合格线 / 本类口径」这类说明，本来就不占时间 ——
+            // 不给分钟数、时刻也不显示，时钟停在最后一个定时步骤上。
+
+            int cursor = t;
             for (int i = 0; i < det.Count; i++)
             {
-                int mm = Math.Max(3, est2[i]);
-                outp.Add(StepAt(t, mm, det[i], ""));
-                t += mm;
+                if (own[i] > 0)
+                {
+                    var st = StepAt(cursor, own[i], det[i], "");
+                    if (fromText[i]) st.Raw = det[i];   // 正文里写了数字，收尾后要同步
+                    st.Fixed = fromText[i];             // 只有课表原文写了数字的才锁死
+                    outp.Add(st);
+                    cursor += own[i];
+                }
+                else
+                {
+                    var st = StepAt(cursor, 0, det[i], "");
+                    st.Time = "";
+                    st.Untimed = true;
+                    outp.Add(st);
+                }
             }
             return outp;
         }

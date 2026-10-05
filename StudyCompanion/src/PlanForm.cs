@@ -267,11 +267,18 @@ namespace StudyCompanion
                         Ui.StrokeRound(g, bx, Ui.Px(6), ColorTranslator.FromHtml("#C7D0DE"), 1.4f);
                     }
 
-                    // 时间 + 时长
+                    // 时间 + 时长（不定时的「合格线 / 说明」行不显示时间，只留一个破折号占位）
                     int ty = (int)r.Y + Ui.Px(3);
-                    Ui.Text(g, s.Time, fTime, done ? Ui.Sub : Ui.Ink, xTime, ty);
-                    Ui.Text(g, s.Minutes + "′", fMin, Ui.Sub,
-                        xTime + (int)g.MeasureString(s.Time, fTime).Width + Ui.Px(4), ty + Ui.Px(4));
+                    if (s.Untimed)
+                    {
+                        Ui.Text(g, "——", fTime, ColorTranslator.FromHtml("#C7D0DE"), xTime, ty);
+                    }
+                    else
+                    {
+                        Ui.Text(g, s.Time, fTime, done ? Ui.Sub : Ui.Ink, xTime, ty);
+                        Ui.Text(g, s.Minutes + "′", fMin, Ui.Sub,
+                            xTime + (int)g.MeasureString(s.Time, fTime).Width + Ui.Px(4), ty + Ui.Px(4));
+                    }
 
                     // 正文
                     Color tc = done ? ColorTranslator.FromHtml("#8A9BAE") : Ui.Ink;

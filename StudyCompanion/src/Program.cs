@@ -385,7 +385,8 @@ namespace StudyCompanion
             if (!string.IsNullOrEmpty(dateArg))
                 DateTime.TryParse(dateArg, out only);
 
-            int slots = 0, bad = 0, noPlan = 0;
+            int slots = 0, bad = 0, noPlan = 0, clash = 0;
+            string clashSample = "";
             var samples = new List<string>();
 
             foreach (var d in ScheduleData.AllDates)
@@ -400,11 +401,22 @@ namespace StudyCompanion
                     var steps = DailyPlan.Steps(s);
                     if (steps.Count == 0 || !HasPlan(steps)) { noPlan++; continue; }
 
-                    // 时间轴必须正好填满该时段
+                    // 时间轴必须正好填满该时段（不定时的「合格线 / 说明」行不计）
                     int sum = 0;
-                    foreach (var st in steps) if (!st.Head) sum += Math.Max(3, st.Minutes);
+                    foreach (var st in steps) if (!st.Head && !st.Untimed) sum += st.Minutes;
                     bool ok = sum == s.DurationMinutes;
                     if (!ok) bad++;
+
+                    // 步骤上的分钟数不能和正文里写的数字打架
+                    // （正文写「（30 分钟）」步骤却显示 25′ —— 这正是要根除的毛病）
+                    foreach (var st in steps)
+                    {
+                        if (st.Head || st.Untimed) continue;
+                        var mm = DailyPlan.StatedMinutes(st.Text);
+                        if (mm > 0 && mm != st.Minutes) { clash++; if (clashSample.Length == 0)
+                            clashSample = s.Start + "-" + s.End + " " + s.Subject + "：正文写 "
+                                + mm + "′，步骤显示 " + st.Minutes + "′ —— " + st.Text; }
+                    }
 
                     if (samples.Count < 3 || !ok)
                     {
@@ -415,6 +427,7 @@ namespace StudyCompanion
                         foreach (var st in steps)
                         {
                             if (st.Head) sb.AppendLine("  [" + st.Text + "]");
+                            else if (st.Untimed) sb.AppendLine("  ——       " + st.Text);
                             else sb.AppendLine("  " + st.Time + " (" + st.Minutes + "′) " + st.Text
                                 + (st.Note.Length > 0 ? "\n        . " + st.Note : ""));
                         }
@@ -428,6 +441,8 @@ namespace StudyCompanion
             log.AppendLine();
             log.AppendLine("时段总数 = " + slots + "，其中无步骤 = " + noPlan
                 + "，时间轴不匹配 = " + bad);
+            log.AppendLine("分钟数与正文打架 = " + clash
+                + (clash > 0 ? "　（例：" + clashSample + "）" : ""));
 
             File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plantest.txt"),
                 log.ToString(), new UTF8Encoding(true));

@@ -567,8 +567,12 @@ public class MainView extends View {
             hit(new RectF(pad, y, pad + w, y + rh), A_STEP, null, i);
 
             float tx = bx + Ui.px(30);
-            Ui.text(c, st.time + "　" + st.minutes + "\u2032", tx, y + Ui.px(24),
-                    Ui.font(11, true, Ui.ACCENT));
+            if (st.untimed) {
+                Ui.text(c, "\u2014\u2014", tx, y + Ui.px(24), Ui.font(11, true, Ui.LINE));
+            } else {
+                Ui.text(c, st.time + "\u3000" + st.minutes + "\u2032", tx, y + Ui.px(24),
+                        Ui.font(11, true, Ui.ACCENT));
+            }
             for (int k = 0; k < tl.size(); k++) {
                 Ui.text(c, tl.get(k), tx, y + Ui.px(44) + k * lh, pT);
             }

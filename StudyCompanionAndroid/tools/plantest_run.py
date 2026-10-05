@@ -103,3 +103,20 @@ if dur is not None:
         bad += 1
         print("  ! 时间轴不匹配：%s 应 %d′ 实 %d′" % (cur, dur, tot))
 print("时间轴自检：时段 %d 个，不匹配 %d 个" % (slots_seen, bad))
+
+# ---- 正文自检：步骤徽标上的分钟数不能和同一行正文里写的数字打架 ----
+# 正文里写「（约 25 分钟，p.4）」而徽标显示 18′ —— 这正是 v2.1.20 要根除的毛病。
+SAID = re.compile(r"(\d+)\s*(?:分钟|[′'])")
+clash = 0
+for line in txt.splitlines():
+    m = MIN.match(line.strip())
+    if not m:
+        continue
+    badge = int(m.group(1))
+    said = SAID.search(line.strip()[m.end():])
+    if said and int(said.group(1)) != badge:
+        clash += 1
+        if clash <= 5:
+            print("  ! 正文与分钟数打架：徽标 %d′，正文写 %s′ —— %s"
+                  % (badge, said.group(1), line.strip()[:70]))
+print("正文与分钟数自检：打架 %d 处" % clash)

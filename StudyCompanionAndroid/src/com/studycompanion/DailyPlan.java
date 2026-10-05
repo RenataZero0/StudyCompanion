@@ -33,6 +33,9 @@ public class DailyPlan {
         public String text = "";      // 主文本
         public String note = "";      // 缩进的小字说明（可空）
         public boolean head = false;  // 是不是「小节标题」这种非可勾选项
+        public boolean fixed = false;   // 分钟数是课表原文里写死的，不许被 fitTail 改
+        public boolean untimed = false; // 「合格线 / 说明」这种不定时的行：不显示分钟、时钟也不走
+        public String raw = "";         // 原文（只有写了分钟数的行才填）——收尾后用它把正文里的数字改回来
     }
 
     static class Ex {
@@ -147,10 +150,37 @@ public class DailyPlan {
         return String.format("%02d:%02d", (total / 60) % 24, total % 60);
     }
 
+    /** 这一行正文里自己写了多少分钟（「（30 分钟）」「20′」）。没写就返回 0。 */
+    public static int statedMinutes(String text) {
+        if (text == null || text.length() == 0) return 0;
+        Matcher m = DUR1.matcher(text);
+        boolean hit = m.find();
+        if (!hit) { m = DUR2.matcher(text); hit = m.find(); }
+        return hit ? parseInt(m.group(1)) : 0;
+    }
+
+    /** 把正文里那个分钟数换掉（跟 statedMinutes 认的是同一处数字）。 */
+    public static String withMinutes(String text, int mm) {
+        if (text == null || text.length() == 0) return text;
+        Matcher g = DUR1.matcher(text);
+        boolean hit = g.find();
+        if (!hit) { g = DUR2.matcher(text); hit = g.find(); }
+        if (!hit) return text;
+        int a = g.start(1), b = g.end(1);
+        return text.substring(0, a) + mm + text.substring(b);
+    }
+
     // ------------------------------------------------------------------ 展开
     public static List<Step> steps(Context c, com.studycompanion.ScheduleData.Slot s) {
         List<Step> out = stepsRaw(c, s);
         fitTail(out, s);
+        // 收尾可能动过分钟数：凡是正文里写了时长的行，把正文里的数字同步成最终值，
+        // 这样「正文写（30 分钟）」和「步骤显示 25′」永远不会同时出现。
+        for (int i = 0; i < out.size(); i++) {
+            Step st = out.get(i);
+            if (!st.head && !st.untimed && st.raw.length() > 0)
+                st.text = withMinutes(st.raw, st.minutes);
+        }
         return out;
     }
 
@@ -158,32 +188,67 @@ public class DailyPlan {
     // 少了最后一步提前收尾，多了最后一步被顶出时段外。
     // 统一收尾：多的补给最后一步，超的从最长的一步开始往下扣，谁也不许低于 MIN_MIN。
     static final int MIN_MIN = 3;
+    // 收尾时的下限只保证「不是 0」：这里再用 3 分钟卡，
+    // 就会出现「把所有步骤顶到 3 分钟、只能回头去砍课表原文写死的数字」的荒唐结果。
+    static final int MIN_TAIL = 1;
 
     static void fitTail(List<Step> out, com.studycompanion.ScheduleData.Slot s) {
         if (s == null || out.isEmpty()) return;
-        List<Integer> idx = new ArrayList<Integer>();
+        List<Integer> idx = new ArrayList<Integer>();   // 可以随便调的（时长是程序算出来的）
+        List<Integer> all = new ArrayList<Integer>();   // 所有定时行（含课表原文里写死的）
         int sum = 0;
         for (int i = 0; i < out.size(); i++) {
             Step st = out.get(i);
-            if (st.head) continue;
-            if (st.minutes < MIN_MIN) st.minutes = MIN_MIN;
+            if (st.head || st.untimed) continue;        // 提示行 / 不定时行不参与
+            if (st.minutes < MIN_TAIL) st.minutes = MIN_TAIL;
             sum += st.minutes;
-            idx.add(Integer.valueOf(i));
+            all.add(Integer.valueOf(i));
+            if (!st.fixed) idx.add(Integer.valueOf(i));
         }
-        if (idx.isEmpty()) return;
+        if (all.isEmpty()) return;
+        // 实在没有「程序算出来的」行时，才允许动课表原文里的数字，
+        // 否则宁可让原文的数字保持原样。
+        if (idx.isEmpty()) idx = all;
 
         int diff = s.duration() - sum;
         if (diff > 0) {
-            int lastI = idx.get(idx.size() - 1).intValue();
-            out.get(lastI).minutes += diff;
+            int flex = 0;
+            for (int i = 0; i < idx.size(); i++) {
+                if (!out.get(idx.get(i).intValue()).fixed) flex++;
+            }
+            if (flex == 0) {
+                // 一个「程序算出来的」行都没有：只能加在最后一步上
+                int lastI = idx.get(idx.size() - 1).intValue();
+                out.get(lastI).minutes += diff;
+                return;
+            }
+            // 富余的时间平摊给「程序算出来的」那些行，免得全堆在最后一步上
+            int each = diff / flex, rest = diff % flex;
+            for (int i = 0; i < idx.size(); i++) {
+                int k = idx.get(i).intValue();
+                Step st = out.get(k);
+                if (st.fixed) continue;
+                st.minutes += each;
+                if (rest > 0) { st.minutes += 1; rest--; }
+            }
             return;
         }
         while (diff < 0) {
             int best = -1;
+            // 先只从「程序算出来的」里挑最长的往下扣
             for (int i = 0; i < idx.size(); i++) {
                 int k = idx.get(i).intValue();
-                if (out.get(k).minutes <= MIN_MIN) continue;
-                if (best < 0 || out.get(k).minutes > out.get(best).minutes) best = k;
+                Step st = out.get(k);
+                if (st.minutes <= MIN_TAIL || st.fixed) continue;
+                if (best < 0 || st.minutes > out.get(best).minutes) best = k;
+            }
+            // 实在没有，才退而求其次去动课表原文里写死的
+            if (best < 0) {
+                for (int i = 0; i < idx.size(); i++) {
+                    int k = idx.get(i).intValue();
+                    if (out.get(k).minutes <= MIN_TAIL) continue;
+                    if (best < 0 || out.get(k).minutes > out.get(best).minutes) best = k;
+                }
             }
             if (best < 0) break;      // 已经全部到底，只能认了
             out.get(best).minutes--;
@@ -305,25 +370,67 @@ public class DailyPlan {
         if (ds.isEmpty()) return out;
         out.add(info(s.subject));
 
+        // 课表原文里自己写了「（25 分钟）」「20′」的，那个数字就是作者定的，
+        // 必须原样照抄 —— 不能再平均分配、更不能被 fitTail 改掉，
+        // 否则会出现「正文写着（30 分钟），步骤上却显示 25′」这种自相矛盾。
         int[] est = new int[ds.size()];
-        int used = 0, blanks = 0;
+        boolean[] fromText = new boolean[ds.size()];
+        int fixedSum = 0, blanks = 0;
         for (int i = 0; i < ds.size(); i++) {
             Matcher m = DUR1.matcher(ds.get(i));
             boolean hit = m.find();
             if (!hit) { m = DUR2.matcher(ds.get(i)); hit = m.find(); }
             est[i] = hit ? parseInt(m.group(1)) : 0;
-            if (est[i] > 0) used += est[i]; else blanks++;
+            if (est[i] > 0) { fromText[i] = true; fixedSum += est[i]; }
+            else blanks++;
         }
-        if (blanks > 0) {
-            int per = Math.max(MIN_MIN, (total - used) / blanks);
-            for (int i = 0; i < est.length; i++) if (est[i] == 0) est[i] = per;
-        } else if (used == 0) {
+        int slack = total - fixedSum;
+        // 原文写的时长加起来比时段本身还长（课表排得太满）：按比例缩小。
+        // 用 floor 保证缩完不会又超出去；正文里的数字随后会跟着改成缩完的值。
+        if (fixedSum > total) {
+            double sc = total * 1.0 / fixedSum;
+            for (int i = 0; i < est.length; i++)
+                if (fromText[i]) est[i] = Math.max(1, (int) Math.floor(est[i] * sc));
+            fixedSum = 0; blanks = 0;
+            for (int i = 0; i < est.length; i++)
+                if (est[i] > 0) fixedSum += est[i]; else blanks++;
+            slack = total - fixedSum;
+        }
+        if (blanks > 0 && slack > 0) {
+            // 剩下的时间平摊给没写时长的行。这些行的正文里本来就没有数字，
+            // 给多少都不会自相矛盾；但富余如果连 1 分钟都不够分，
+            // 就只能让排在后面的那几行改成不定时，不能超支。
+            int per = Math.max(1, slack / blanks);
+            int given = 0;
+            for (int i = 0; i < est.length; i++) {
+                if (est[i] != 0) continue;
+                if (given + per > slack) continue;   // 余量不够了，这行改用不定时
+                est[i] = per;
+                given += per;
+            }
+        } else if (fixedSum == 0) {
+            // 一行都没写时长：按行数平分
             int even = Math.max(MIN_MIN, total / Math.max(1, ds.size()));
             for (int i = 0; i < est.length; i++) est[i] = even;
         }
+        // 剩下的情况：作者写的时长已经把这个时段占满了。
+        // 那些没写时长的行是「合格线 / 本类口径」这类说明，本来就不占时间 ——
+        // 不给分钟数、时刻也不显示，时钟停在最后一个定时步骤上。
+
+        int cursor = t;
         for (int i = 0; i < ds.size(); i++) {
-            out.add(step(t, Math.max(MIN_MIN, est[i]), ds.get(i), ""));
-            t += Math.max(MIN_MIN, est[i]);
+            if (est[i] > 0) {
+                Step st = step(cursor, est[i], ds.get(i), "");
+                if (fromText[i]) st.raw = ds.get(i);   // 正文里写了数字，收尾后要同步
+                st.fixed = fromText[i];                // 只有课表原文写了数字的才锁死
+                out.add(st);
+                cursor += est[i];
+            } else {
+                Step st = step(cursor, 0, ds.get(i), "");
+                st.time = "";
+                st.untimed = true;
+                out.add(st);
+            }
         }
         return out;
     }

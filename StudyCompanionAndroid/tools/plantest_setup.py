@@ -122,6 +122,7 @@ public class Test {
             System.out.println("### " + s.start + "-" + s.end + "  " + s.subject);
             for (DailyPlan.Step x : st) {
                 if (x.head) { System.out.println("  [小节] " + x.text); continue; }
+                if (x.untimed) { System.out.println("  \\u2014\\u2014       " + x.text); continue; }
                 System.out.println("  " + x.time + " (" + x.minutes + "\\u2032) " + x.text);
                 if (x.note.length() > 0)
                     for (String n : x.note.split("\\n")) System.out.println("        . " + n);
