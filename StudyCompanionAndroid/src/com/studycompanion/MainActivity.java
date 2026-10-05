@@ -679,7 +679,7 @@ public class MainActivity extends Activity implements MainView.Listener {
                     runOnUiThread(new Runnable() {
                         public void run() { showAuthorizeDialog(dc); }
                     });
-                    String token = GitHub.devicePoll(dc, new GitHub.Cancel() {
+                    String token = GitHub.devicePoll(MainActivity.this, dc, new GitHub.Cancel() {
                         public boolean cancelled() { return cancelLogin; }
                     });
                     final String login = GitHub.currentUserWith(MainActivity.this, token);

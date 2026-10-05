@@ -45,3 +45,8 @@ _release_notes.md
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# GitHub 登录令牌（DPAPI 加密，但绝不该进版本库 —— 仓库是公开的）
+StudyCompanion/data/github.dat
+StudyCompanion/data/github.dat.user
+StudyCompanion/data/github.rt

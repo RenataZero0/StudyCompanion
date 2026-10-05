@@ -4,6 +4,77 @@
 
 ---
 
+## v2.1.15 —— 不用再反复授权了
+
+### 症状
+
+两端同步时都要**重新去 GitHub 授权一次**，很烦。
+
+### 根因：刷新令牌被丢掉了
+
+GitHub 的 OAuth App 有一个开关 **「Expire user access tokens」**。
+一旦打开，颁发的 access token **只有 8 小时寿命**，到期必须用同时颁发的
+`refresh_token` 去换一个新的，否则就得让用户重新走一遍授权。
+
+而登录流程里拿到响应后，代码**只取了 `access_token`**：
+
+```csharp
+string tok = Str(d, "access_token");
+if (!string.IsNullOrEmpty(tok)) return tok;      // refresh_token / expires_in 直接丢了
+```
+
+于是过 8 小时令牌过期，应用没有任何办法自续 —— 只能再弹一次授权。
+两端共用同一个 Client ID，所以**两端都会这样**。
+
+### 现在
+
+两端都实现了自动续期：
+
+| 环节 | 改动 |
+|---|---|
+| 登录时 | 连同 `refresh_token` / `expires_in` 一起存下来 |
+| 每次请求前 | 检查是否快过期（**提前 5 分钟**），是的话先用 refresh_token 换新的 |
+| 续期失败 | 静默降级，不打断当前操作；真的 401 了才提示重新登录 |
+| 退出登录 | 连 refresh_token 一起清掉 |
+
+- Windows：存在 `%APPDATA%\StudyCompanion\data\github.rt`（DPAPI `CurrentUser` 加密）
+- 安卓：存在 SharedPreferences `study` 的 `gh_refresh` / `gh_expires`
+- 如果 GitHub **没有**开启令牌过期（不返回 `refresh_token`），这套逻辑自动不启用，行为和以前一样
+
+> **注意**：这次更新后需要**再登录一次** —— 因为以前的登录没保存 refresh_token，
+> 手里那个旧令牌已经无法自续了。登录这一次之后就不用再管了。
+
+### 更省事的做法（可选）
+
+上面是应用侧的兜底。如果你想让令牌**根本不会过期**，可以在 GitHub 上一次性关掉它：
+
+```
+GitHub → 右上角头像 → Settings → Developer settings
+      → OAuth Apps → StudyCompanion
+      → 取消勾选「Expire user access tokens」→ Update application
+```
+
+关掉之后颁发的就是长期令牌，连续期都不需要了。
+
+### 顺带修一个安全问题
+
+`StudyCompanion/data/github.dat`（登录令牌，DPAPI 加密）和 `github.dat.user`
+**一直被 git 跟踪并提交**，而仓库是公开的。
+
+虽然 DPAPI 用 `CurrentUser` 加密、换台机器解不开，但把令牌文件提交上去本身就不对；
+而且 `Store.MigrateOnce()` 会把仓库里的 `data\*` 拷进 `%APPDATA%`，
+新装时可能继承一个陈旧的令牌，表现为「明明登录了却报 401」。
+
+已从版本控制移除（磁盘上保留，程序照常用），并在 `.gitignore` 里加上规则：
+
+```
+StudyCompanion/data/github.dat
+StudyCompanion/data/github.dat.user
+StudyCompanion/data/github.rt
+```
+
+---
+
 ## v2.1.14 —— Windows 只发安装版
 
 以前每版发两个 Windows 文件：

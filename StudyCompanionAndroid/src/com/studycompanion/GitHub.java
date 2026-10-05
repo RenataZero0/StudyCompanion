@@ -34,7 +34,7 @@ public class GitHub {
     public static final String SCOPE = "repo";
 
     /** 本 APK 对应的 Release 标签。每次发版时与 Release 一起改，用于判断有没有新版。 */
-    public static final String VERSION_TAG = "v2.1.14";
+    public static final String VERSION_TAG = "v2.1.15";
 
     public static final String DEVICE_CODE_URL = "https://github.com/login/device/code";
     public static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -94,7 +94,58 @@ public class GitHub {
     }
 
     public static void logout(Context c) {
-        sp(c).edit().remove("gh_token").remove("gh_user").apply();
+        sp(c).edit().remove("gh_token").remove("gh_user")
+                .remove("gh_refresh").remove("gh_expires").apply();
+    }
+
+    // ---------------------------------------------------------------- 刷新令牌
+    // GitHub 的 OAuth App 可以打开「Expire user access tokens」，那样 access token
+    // 只有 8 小时寿命，必须用 refresh_token 换新的。
+    // 之前只保存了 access_token，于是每天都要重新授权一次。
+
+    /** 保存 refresh_token。rt 为空表示这个令牌长期有效，不需要续期。 */
+    public static void saveRefresh(Context c, String rt, int expiresIn) {
+        android.content.SharedPreferences.Editor e = sp(c).edit();
+        if (rt == null || rt.length() == 0) {
+            e.remove("gh_refresh").remove("gh_expires").apply();
+            return;
+        }
+        // 提前 5 分钟续期，免得刚好卡在边界上失效
+        long at = expiresIn > 0 ? System.currentTimeMillis() + (expiresIn - 300) * 1000L : 0L;
+        e.putString("gh_refresh", rt).putLong("gh_expires", at).apply();
+    }
+
+    public static boolean canAutoRefresh(Context c) {
+        return sp(c).getString("gh_refresh", "").length() > 0;
+    }
+
+    /**
+     * 令牌快过期/已过期时用 refresh_token 换一个新的。换了返回 true。
+     * Context 为 null 时只做判断不落盘（供不便传 Context 的地方调用）。
+     */
+    public static boolean ensureFreshToken(Context c) {
+        if (c == null) return false;
+        String rt = sp(c).getString("gh_refresh", "");
+        if (rt.length() == 0) return false;                       // 长期令牌，不用管
+        long at = sp(c).getLong("gh_expires", 0L);
+        if (at <= 0) return false;
+        if (System.currentTimeMillis() < at) return false;        // 还没到期
+
+        try {
+            String body = form("client_id", CLIENT_ID, "grant_type", "refresh_token",
+                    "refresh_token", rt);
+            JSONObject j = new JSONObject(postForm(TOKEN_URL, body));
+            if (j.optString("error", "").length() > 0) return false;
+            String tok = j.optString("access_token", "");
+            if (tok.length() == 0) return false;
+
+            saveToken(c, tok, sp(c).getString("gh_user", ""));
+            String nrt = j.optString("refresh_token", "");
+            saveRefresh(c, nrt.length() > 0 ? nrt : rt, j.optInt("expires_in", 0));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // ================================================================== HTTP
@@ -187,7 +238,7 @@ public class GitHub {
     }
 
     /** 轮询换 token。cancel 由外部置位；返回 access_token */
-    public static String devicePoll(DeviceCode dc, Cancel cancel) throws Exception {
+    public static String devicePoll(Context c, DeviceCode dc, Cancel cancel) throws Exception {
         long deadline = System.currentTimeMillis() + dc.expiresIn * 1000L;
         int interval = Math.max(5, dc.interval);
         while (System.currentTimeMillis() < deadline) {
@@ -211,7 +262,12 @@ public class GitHub {
             if ("access_denied".equals(err)) throw new Exception("你在页面上点了取消");
             if (err.length() > 0) throw new Exception("GitHub 返回：" + err);
             String tok = j.optString("access_token", "");
-            if (tok.length() > 0) return tok;
+            if (tok.length() > 0) {
+                // GitHub 若开了令牌过期，会一起给 refresh_token 和 expires_in，
+                // 必须存下来，否则过 8 小时就得重新授权。
+                saveRefresh(c, j.optString("refresh_token", ""), j.optInt("expires_in", 0));
+                return tok;
+            }
         }
         throw new Exception("等待超时，请重新登录");
     }
@@ -336,6 +392,8 @@ public class GitHub {
      * 所以 401 时去掉令牌重试；能成说明存的是坏令牌，顺手清掉。
      */
     public static JSONObject api(Context c, String path) throws Exception {
+        // 令牌可能快过期了，先用 refresh_token 续一下再发请求
+        ensureFreshToken(c);
         String tok = token(c);
         try {
             return new JSONObject(request("GET", API + path, null, tok, "application/vnd.github+json"));
