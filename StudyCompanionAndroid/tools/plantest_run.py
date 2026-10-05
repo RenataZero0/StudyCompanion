@@ -74,3 +74,32 @@ print("java exit =", r.returncode)
 if r.stderr:
     print(r.stderr.decode("utf-8", "replace")[:800])
 print("输出 ->", os.path.join(T, "steps.txt"), " 共", len(txt.splitlines()), "行")
+
+# ---- 时间轴自检：每个时段里所有步骤的分钟数必须正好等于时段长度 ----
+HDR = re.compile(r"^###\s+(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})\s+(.*)$")
+MIN = re.compile(r"^\d{1,2}:\d{2}\s+\((\d+)[′']\)")
+dur = None
+tot = 0
+bad = 0
+slots_seen = 0
+for line in txt.splitlines():
+    h = HDR.match(line)
+    if h:
+        if dur is not None:
+            slots_seen += 1
+            if tot != dur:
+                bad += 1
+                print("  ! 时间轴不匹配：%s 应 %d′ 实 %d′" % (cur, dur, tot))
+        dur = (int(h.group(3)) * 60 + int(h.group(4))) - (int(h.group(1)) * 60 + int(h.group(2)))
+        cur = h.group(5)
+        tot = 0
+        continue
+    m = MIN.match(line.strip())
+    if m and dur is not None:
+        tot += int(m.group(1))
+if dur is not None:
+    slots_seen += 1
+    if tot != dur:
+        bad += 1
+        print("  ! 时间轴不匹配：%s 应 %d′ 实 %d′" % (cur, dur, tot))
+print("时间轴自检：时段 %d 个，不匹配 %d 个" % (slots_seen, bad))

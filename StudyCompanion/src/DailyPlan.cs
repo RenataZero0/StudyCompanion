@@ -178,25 +178,45 @@ namespace StudyCompanion
         }
 
         /// <summary>
-        /// 整数除法会把余数丢掉，导致最后一步比时段结束早几分钟收尾。
-        /// 这里把差额补给最后一步，保证时间轴正好铺满整个时段。
+        /// 整数除法、以及「至少 N 分钟」的下限，都会让步骤总时长和时段对不上：
+        /// 少了几分钟 → 最后一步提前收尾；多了几分钟 → 最后一步被顶出时段外。
+        /// 这里统一收尾：多的补给最后一步，超的从最长的一步开始往下扣，谁也不许低于 MinMin。
         /// </summary>
+        const int MinMin = 3;
+
         static void FitTail(List<Step> outp, Slot s)
         {
             if (s == null || outp.Count == 0) return;
-            int sum = 0, last = -1;
+            var idx = new List<int>();
+            int sum = 0;
             for (int i = 0; i < outp.Count; i++)
             {
                 if (outp[i].Head) continue;
-                if (outp[i].Minutes < 3) outp[i].Minutes = 3;   // 和绘制时的下限保持一致
+                if (outp[i].Minutes < MinMin) outp[i].Minutes = MinMin;
                 sum += outp[i].Minutes;
-                last = i;
+                idx.Add(i);
             }
-            if (last < 0) return;
-            int delta = s.DurationMinutes - sum;
-            int want = outp[last].Minutes + delta;
-            if (want < 3) want = 3;
-            outp[last].Minutes = want;
+            if (idx.Count == 0) return;
+
+            int diff = s.DurationMinutes - sum;
+            if (diff > 0)
+            {
+                outp[idx[idx.Count - 1]].Minutes += diff;
+                return;
+            }
+            while (diff < 0)
+            {
+                int best = -1;
+                for (int i = 0; i < idx.Count; i++)
+                {
+                    int k = idx[i];
+                    if (outp[k].Minutes <= MinMin) continue;
+                    if (best < 0 || outp[k].Minutes > outp[best].Minutes) best = k;
+                }
+                if (best < 0) break;      // 已经全部到底，只能认了
+                outp[best].Minutes--;
+                diff++;
+            }
         }
 
         static List<Step> StepsRaw(Slot s)
@@ -302,7 +322,7 @@ namespace StudyCompanion
                 if (!anyEx)
                 {
                     var ds = Details(s);
-                    int stp = Math.Max(10, budget / Math.Max(1, ds.Count));
+                    int stp = Math.Max(MinMin, budget / Math.Max(1, ds.Count));
                     for (int i = 0; i < ds.Count; i++)
                     {
                         outp.Add(StepAt(t, stp, ds[i], ""));
@@ -336,12 +356,12 @@ namespace StudyCompanion
             }
             if (blanks > 0)
             {
-                int per = Math.Max(5, (total - used) / blanks);
+                int per = Math.Max(MinMin, (total - used) / blanks);
                 for (int i = 0; i < est2.Length; i++) if (est2[i] == 0) est2[i] = per;
             }
             else if (used == 0)
             {
-                int even = Math.Max(5, total / Math.Max(1, det.Count));
+                int even = Math.Max(MinMin, total / Math.Max(1, det.Count));
                 for (int i = 0; i < est2.Length; i++) est2[i] = even;
             }
             for (int i = 0; i < det.Count; i++)

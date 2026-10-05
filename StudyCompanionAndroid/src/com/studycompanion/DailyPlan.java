@@ -154,20 +154,41 @@ public class DailyPlan {
         return out;
     }
 
-    // 整数除法会丢余数，最后一步会比时段结束早几分钟收尾。把差额补给最后一步。
+    // 整数除法、「至少 N 分钟」的下限，都会让步骤总时长和时段对不上：
+    // 少了最后一步提前收尾，多了最后一步被顶出时段外。
+    // 统一收尾：多的补给最后一步，超的从最长的一步开始往下扣，谁也不许低于 MIN_MIN。
+    static final int MIN_MIN = 3;
+
     static void fitTail(List<Step> out, com.studycompanion.ScheduleData.Slot s) {
         if (s == null || out.isEmpty()) return;
-        int sum = 0, last = -1;
+        List<Integer> idx = new ArrayList<Integer>();
+        int sum = 0;
         for (int i = 0; i < out.size(); i++) {
             Step st = out.get(i);
             if (st.head) continue;
-            if (st.minutes < 3) st.minutes = 3;   // 和绘制时的下限保持一致
+            if (st.minutes < MIN_MIN) st.minutes = MIN_MIN;
             sum += st.minutes;
-            last = i;
+            idx.add(Integer.valueOf(i));
         }
-        if (last < 0) return;
-        int want = out.get(last).minutes + (s.duration() - sum);
-        out.get(last).minutes = want < 3 ? 3 : want;
+        if (idx.isEmpty()) return;
+
+        int diff = s.duration() - sum;
+        if (diff > 0) {
+            int lastI = idx.get(idx.size() - 1).intValue();
+            out.get(lastI).minutes += diff;
+            return;
+        }
+        while (diff < 0) {
+            int best = -1;
+            for (int i = 0; i < idx.size(); i++) {
+                int k = idx.get(i).intValue();
+                if (out.get(k).minutes <= MIN_MIN) continue;
+                if (best < 0 || out.get(k).minutes > out.get(best).minutes) best = k;
+            }
+            if (best < 0) break;      // 已经全部到底，只能认了
+            out.get(best).minutes--;
+            diff++;
+        }
     }
 
     static List<Step> stepsRaw(Context c, com.studycompanion.ScheduleData.Slot s) {
@@ -193,7 +214,7 @@ public class DailyPlan {
 
             int openMin = 3, noteMin = 8, ankiMin = 5;
             int readTotal = Math.max(15, total - openMin - noteMin - ankiMin - 4);
-            int per = Math.max(10, readTotal / Math.max(1, secList.size()));
+            int per = Math.max(MIN_MIN, readTotal / Math.max(1, secList.size()));
 
             t += 0;
             out.add(step(t, openMin, "翻到课本先看本节 Learning outcomes，在纸上写下「这节我要学会哪几件事」", ""));
@@ -264,7 +285,7 @@ public class DailyPlan {
             }
             if (!anyEx) {
                 List<String> ds = details(s);
-                int step = Math.max(10, budget / Math.max(1, ds.size()));
+                int step = Math.max(MIN_MIN, budget / Math.max(1, ds.size()));
                 for (int i = 0; i < ds.size(); i++) {
                     out.add(step(t, step, ds.get(i), ""));
                     t += step;
@@ -294,15 +315,15 @@ public class DailyPlan {
             if (est[i] > 0) used += est[i]; else blanks++;
         }
         if (blanks > 0) {
-            int per = Math.max(5, (total - used) / blanks);
+            int per = Math.max(MIN_MIN, (total - used) / blanks);
             for (int i = 0; i < est.length; i++) if (est[i] == 0) est[i] = per;
         } else if (used == 0) {
-            int even = Math.max(5, total / Math.max(1, ds.size()));
+            int even = Math.max(MIN_MIN, total / Math.max(1, ds.size()));
             for (int i = 0; i < est.length; i++) est[i] = even;
         }
         for (int i = 0; i < ds.size(); i++) {
-            out.add(step(t, Math.max(3, est[i]), ds.get(i), ""));
-            t += Math.max(3, est[i]);
+            out.add(step(t, Math.max(MIN_MIN, est[i]), ds.get(i), ""));
+            t += Math.max(MIN_MIN, est[i]);
         }
         return out;
     }
