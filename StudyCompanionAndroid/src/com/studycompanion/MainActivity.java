@@ -745,7 +745,7 @@ public class MainActivity extends Activity implements MainView.Listener {
 
     private void onLoginError(Exception e) {
         dismissBusy();
-        simple("登录失败", String.valueOf(e.getMessage()));
+        simple("登录失败", GitHub.friendly(e));
     }
 
     @Override
@@ -798,7 +798,7 @@ public class MainActivity extends Activity implements MainView.Listener {
 
     private void onSyncError(Exception e) {
         dismissBusy();
-        simple("同步失败", String.valueOf(e.getMessage()));
+        simple("同步失败", GitHub.friendly(e));
     }
 
     // ================================================================== 更新
@@ -846,7 +846,7 @@ public class MainActivity extends Activity implements MainView.Listener {
 
     private void onUpdateError(Exception e) {
         dismissBusy();
-        simple("检查更新失败", String.valueOf(e.getMessage()));
+        simple("检查更新失败", GitHub.friendly(e));
     }
 
     /**
@@ -963,7 +963,7 @@ public class MainActivity extends Activity implements MainView.Listener {
 
     private void onDownloadError(Exception e) {
         dismissBusy();
-        simple("下载失败", String.valueOf(e.getMessage()));
+        simple("下载失败", GitHub.friendly(e));
     }
 
     private void installApk(File apk) {

@@ -49,7 +49,7 @@ namespace StudyCompanion
         public const string Scope = "repo";
 
         /// <summary>本 exe 对应的 Release 标签，用于判断有没有新版</summary>
-        public const string VersionTag = "v2.1.12";
+        public const string VersionTag = "v2.1.13";
 
         public const string SyncPath = "sync/progress.txt";
         /// <summary>打卡记录的 CSV 也会自动传到这里，不用手动导出</summary>
@@ -188,6 +188,70 @@ namespace StudyCompanion
 
         /// <summary>令牌失效时触发（用来提示用户重新登录）</summary>
         public static Action AuthLost;
+
+        /// <summary>
+        /// 把底层报错翻译成用户看得懂的话 —— 说清「出了什么事」和「该怎么办」。
+        ///
+        /// 以前直接把 `HTTP 401  {"message":"Bad credentials",...}` 甩进弹窗，
+        /// 用户既看不懂也不知道下一步做什么。
+        /// </summary>
+        public static string Friendly(Exception ex)
+        {
+            string m = ex == null ? "" : ex.Message;
+            if (string.IsNullOrEmpty(m)) return "发生了未知错误。";
+            string low = m.ToLowerInvariant();
+
+            if (m.StartsWith("HTTP 401", StringComparison.Ordinal))
+                return "登录已失效（HTTP 401 Bad credentials）\n\n"
+                     + "本地保存的 GitHub 令牌过期或被撤销了。\n"
+                     + "点「登录 GitHub」重新登录一次就好。";
+
+            if (m.StartsWith("HTTP 403", StringComparison.Ordinal))
+            {
+                if (low.Contains("rate limit") || low.Contains("abuse"))
+                    return "触发 GitHub 访问频率限制（HTTP 403）\n\n"
+                         + "短时间内请求太多次了，等几分钟再试。\n"
+                         + "自动检查每天只运行一次；手动连续点也会触发。";
+                return "GitHub 拒绝了这次请求（HTTP 403）\n\n"
+                     + "通常是令牌权限不足，或者账号被限制。\n"
+                     + "可以退出登录后重新授权一次。";
+            }
+
+            if (m.StartsWith("HTTP 404", StringComparison.Ordinal))
+                return "找不到内容（HTTP 404）\n\n"
+                     + "仓库不存在、被改名或已删除；\n"
+                     + "也可能是没登录时访问了私有仓库。";
+
+            if (m.StartsWith("HTTP 409", StringComparison.Ordinal))
+                return "同步冲突（HTTP 409）\n\n"
+                     + "远端文件被另一台设备改过了。再同步一次通常就好了。";
+
+            if (m.StartsWith("HTTP 422", StringComparison.Ordinal))
+                return "请求内容被 GitHub 拒绝（HTTP 422）\n\n"
+                     + "一般出现在写入同步数据时，再试一次。";
+
+            if (m.StartsWith("HTTP 5", StringComparison.Ordinal))
+                return "GitHub 服务端出错（" + m.Substring(0, Math.Min(9, m.Length)).Trim()
+                     + "）\n\n这是对方的问题，过一会儿再试。";
+
+            if (low.Contains("ssl") || m.Contains("安全通道"))
+                return "加密连接建立失败（TLS 握手失败）\n\n"
+                     + "常见原因：系统时间不对、系统缺少 TLS 1.2，\n"
+                     + "或者网络中间有设备在拦截 HTTPS。";
+
+            if (m.Contains("超时") || low.Contains("timeout") || low.Contains("timed out"))
+                return "连接超时\n\n"
+                     + "网络太慢或被挡住了。本仓库在 GitHub 上，\n"
+                     + "国内使用通常需要先开代理。";
+
+            if (m.Contains("网络错误") || low.Contains("unable to connect")
+                || low.Contains("name resolution") || low.Contains("no such host"))
+                return "连不上 GitHub\n\n"
+                     + "检查一下网络；如果人在国内，通常需要开启代理再试。";
+
+            // 认不出来就把原文给他，至少别丢信息
+            return m;
+        }
 
         /// <summary>
         /// 公开接口不该被坏令牌连累。

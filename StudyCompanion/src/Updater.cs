@@ -174,7 +174,7 @@ namespace StudyCompanion
             }
             catch (Exception ex)
             {
-                MessageBox.Show(owner, "下载失败：" + ex.Message, "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(owner, "下载失败\n\n" + GitHub.Friendly(ex), "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -208,7 +208,7 @@ namespace StudyCompanion
             }
             catch (Exception ex)
             {
-                MessageBox.Show(owner, "自动替换失败：" + ex.Message, "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(owner, "自动替换失败\n\n" + GitHub.Friendly(ex), "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -240,7 +240,7 @@ namespace StudyCompanion
             }
             catch (Exception ex)
             {
-                MessageBox.Show(owner, "检查更新失败：" + ex.Message, "提示");
+                MessageBox.Show(owner, "检查更新失败\n\n" + GitHub.Friendly(ex), "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
     }

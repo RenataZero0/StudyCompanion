@@ -405,7 +405,7 @@ namespace StudyCompanion
             }
             catch (Exception ex)
             {
-                SetLog("自动替换失败：" + ex.Message);
+                SetLog("自动替换失败：" + GitHub.Friendly(ex));
             }
         }
     }
