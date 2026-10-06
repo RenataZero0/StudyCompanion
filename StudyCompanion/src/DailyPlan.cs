@@ -60,6 +60,11 @@ namespace StudyCompanion
         static readonly Regex RANGE_RE = new Regex(@"^(\d+)\s*[–\-~]\s*(\d+)$", RegexOptions.Compiled);
         static readonly Regex MIN_RE = new Regex(@"(\d+)\s*[′'’]", RegexOptions.Compiled);
         static readonly Regex MIN2_RE = new Regex(@"(\d+)\s*分钟", RegexOptions.Compiled);
+        // 「每节 5 分钟」说的是**每小节**的时长，不是这一行的总时长。
+        // 课表里写「速览 §1.1…§1.4（每节 5 分钟）」= 4 节 ×5 分 = 20 分钟。
+        static readonly Regex PER_RE = new Regex(@"(?:每节|各|每个|每小块)\s*(\d+)\s*分钟", RegexOptions.Compiled);
+        // 收尾后写回去的「共 N 分钟」——优先级最高，它就是这一行的总时长。
+        static readonly Regex TOTAL_RE = new Regex(@"共\s*(\d+)\s*分钟", RegexOptions.Compiled);
 
         // ------------------------------------------------------------------ 加载
         /// <summary>三张小表的候选目录：程序自带的那份优先，用户目录那份可以覆盖</summary>
@@ -167,20 +172,46 @@ namespace StudyCompanion
             return "";
         }
 
-        static string Hhmm(int total)
+        public static string Hhmm(int total)
         {
             return ((total / 60) % 24).ToString("00") + ":" + (total % 60).ToString("00");
         }
 
         /// <summary>
-        /// 这一行正文里自己写了多少分钟（「（30 分钟）」「20′」）。没写就返回 0。
+        /// 这一行正文里自己写了多少分钟（「（30 分钟）」「20′」「每节 5 分钟」）。没写就返回 0。
         /// 自检用它来确认「步骤上显示的分钟数」和「正文里写的」一致。
         /// </summary>
+        /// <summary>
+        /// 「标签段」：第一个中文冒号之前的部分。
+        /// 作者写时长一律写在标签段里（`① 回收（10 分钟）：…`、`Ex 2A 题 1–16（约 34 分钟，p.37）`）；
+        /// 冒号之后的正文里出现的数字只是描述，不是这一行的量 ——
+        /// 比如 `✓ 合格线（自己判定）：复述能连续讲满 2 分钟…` 里的 2 分钟是要求，不是步骤时长；
+        /// `③ 产出（30 分钟）：…听一段 5–8 分钟真讲座…` 里的 5–8 分钟是材料长度。
+        /// 早先把整行都拿去搜数字，结果把 10/25/30/10 的 EAP 格子重算成 9/24/29/9，
+        /// 正文里的数字也跟着被改 —— 看起来就是「时间和安排不符」。
+        /// </summary>
+        static string LabelOf(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            int i = text.IndexOf('：');
+            return i > 0 ? text.Substring(0, i) : text;
+        }
+
         public static int StatedMinutes(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
-            var m = MIN_RE.Match(text);
-            if (!m.Success) m = MIN2_RE.Match(text);
+            string seg = LabelOf(text);
+            var tot = TOTAL_RE.Match(seg);           // 已经写明了总数，以它为准
+            if (tot.Success) return ParseInt(tot.Groups[1].Value);
+            var per = PER_RE.Match(seg);             // 「每节 5 分钟」× 节数
+            if (per.Success)
+            {
+                int n = ParseInt(per.Groups[1].Value);
+                int cnt = SecListOf(seg).Count;
+                if (cnt >= 1) return n * cnt;
+            }
+            var m = MIN_RE.Match(seg);
+            if (!m.Success) m = MIN2_RE.Match(seg);
             return m.Success ? ParseInt(m.Groups[1].Value) : 0;
         }
 
@@ -188,8 +219,31 @@ namespace StudyCompanion
         public static string WithMinutes(string text, int mm)
         {
             if (string.IsNullOrEmpty(text)) return text;
-            var g = MIN_RE.Match(text);
-            if (!g.Success) g = MIN2_RE.Match(text);
+            string seg = LabelOf(text);
+            // 「每节 N 分钟」这种写法：N 是每节的量，不能直接改成总数。
+            if (PER_RE.IsMatch(seg))
+            {
+                var tot = TOTAL_RE.Match(seg);
+                if (tot.Success)
+                {
+                    var d0 = tot.Groups[1];
+                    return text.Substring(0, d0.Index) + mm.ToString() + text.Substring(d0.Index + d0.Length);
+                }
+                var p = PER_RE.Match(seg);
+                int n = ParseInt(p.Groups[1].Value);
+                int cnt = SecListOf(seg).Count;
+                if (cnt >= 1 && n * cnt != mm)
+                {
+                    // 时段排不下，已经按比例压缩过：这时「每节 5 分钟」和实际总量对不上，
+                    // 与其留下「每节 5 分钟，共 16 分钟」这种自相矛盾，不如只留总量。
+                    return text.Substring(0, p.Index) + "共 " + mm + " 分钟"
+                        + text.Substring(p.Index + p.Value.Length);
+                }
+                return text.Substring(0, p.Index) + p.Value + "，共 " + mm + " 分钟"
+                    + text.Substring(p.Index + p.Value.Length);
+            }
+            var g = MIN_RE.Match(seg);
+            if (!g.Success) g = MIN2_RE.Match(seg);
             if (!g.Success) return text;
             var d = g.Groups[1];
             return text.Substring(0, d.Index) + mm.ToString() + text.Substring(d.Index + d.Length);
@@ -205,6 +259,15 @@ namespace StudyCompanion
             foreach (var st in outp)
                 if (!st.Head && !st.Untimed && st.Raw.Length > 0)
                     st.Text = WithMinutes(st.Raw, st.Minutes);
+            // FitTail 改过分钟数之后，时钟必须重排一遍 ——
+            // 否则会看到「20:05 起、28 分钟」的下一步却写着 20:32（该是 20:33）。
+            int cursor = s.StartMinutes;
+            foreach (var st in outp)
+            {
+                if (st.Head || st.Untimed) continue;   // 不定时的行不走钟
+                st.Time = Hhmm(cursor);
+                cursor += st.Minutes;
+            }
             return outp;
         }
 
@@ -217,6 +280,8 @@ namespace StudyCompanion
         // 收尾时的下限只保证「不是 0」：这里再用 3 分钟卡，
         // 就会出现「把所有步骤顶到 3 分钟、只能回头去砍课表原文写死的数字」的荒唐结果。
         const int MinTail = 1;
+        // 没写时长的行至少分到这么多分钟才值得给时间，否则显示成不定时。
+        const int MinUseful = 3;
 
         static void FitTail(List<Step> outp, Slot s)
         {
@@ -244,8 +309,8 @@ namespace StudyCompanion
                 for (int i = 0; i < idx.Count; i++) if (!outp[idx[i]].Fixed) flex++;
                 if (flex == 0)
                 {
-                    // 一个「程序算出来的」行都没有：只能加在最后一步上
-                    outp[idx[idx.Count - 1]].Minutes += diff;
+                    // 全是课表原文写死的时长：宁可让这个时段提前几分钟结束，
+                    // 也不能去改原文的数字 —— 改了就是「时间和安排不符」。
                     return;
                 }
                 // 富余的时间平摊给「程序算出来的」那些行，免得全堆在最后一步上
@@ -417,11 +482,7 @@ namespace StudyCompanion
             int fixedSum = 0, blanks = 0;
             for (int i = 0; i < det.Count; i++)
             {
-                // 先找「20′」这种写法，找不到再找「20分钟」。
-                // 注意：不能对同一个 Matcher 连着调两次 find()——第一次已经越过了那个数字。
-                var m = MIN_RE.Match(det[i]);
-                if (!m.Success) m = MIN2_RE.Match(det[i]);
-                own[i] = m.Success ? ParseInt(m.Groups[1].Value) : 0;
+                own[i] = StatedMinutes(det[i]);
                 if (own[i] > 0) { fromText[i] = true; fixedSum += own[i]; }
                 else blanks++;
             }
@@ -439,12 +500,12 @@ namespace StudyCompanion
             }
 
             int slack = total - fixedSum;
-            if (blanks > 0 && slack > 0)
+            // 没写时长的行（「逐题批改」「做完对照答案」这类说明）只有在能分到
+            // MinUseful 分钟以上时才给时间。只分到 1–2 分钟毫无意义 ——
+            // 「逐题批改 (1′)」比「——（属于上一步）」更容易让人误解。
+            if (blanks > 0 && slack / blanks >= MinUseful)
             {
-                // 剩下的时间平摊给没写时长的行。这些行的正文里本来就没有数字，
-                // 给多少都不会自相矛盾；但富余如果连 1 分钟都不够分，
-                // 就只能让排在后面的那几行改成不定时，不能超支。
-                int per = Math.Max(1, slack / blanks);
+                int per = slack / blanks;
                 int given = 0;
                 for (int i = 0; i < own.Length; i++)
                 {
@@ -453,6 +514,14 @@ namespace StudyCompanion
                     own[i] = per;
                     given += per;
                 }
+            }
+            else if (blanks > 0 && slack >= MinUseful)
+            {
+                // 平摊不够看（例如 3 行只摊到 5 分钟）：把这点余量整块给第一条说明行 ——
+                // 它通常紧跟在习题后面，是「逐题批改」这种真要吃时间的活。
+                // 这样时间轴照样收在时段末尾，又不会冒出 1–2 分钟的空步骤。
+                for (int i = 0; i < own.Length; i++)
+                    if (own[i] == 0) { own[i] = slack; break; }
             }
             else if (fixedSum == 0)
             {

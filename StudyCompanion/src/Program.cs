@@ -385,9 +385,10 @@ namespace StudyCompanion
             if (!string.IsNullOrEmpty(dateArg))
                 DateTime.TryParse(dateArg, out only);
 
-            int slots = 0, bad = 0, noPlan = 0, clash = 0;
-            string clashSample = "";
+            int slots = 0, bad = 0, noPlan = 0, clash = 0, clkBad = 0, tailBad = 0, shortBy = 0, scaled = 0, overSlots = 0;
+            string clashSample = "", clkSample = "", tailSample = "", scaledSample = "";
             var samples = new List<string>();
+            var dump = new StringBuilder();
 
             foreach (var d in ScheduleData.AllDates)
             {
@@ -401,14 +402,19 @@ namespace StudyCompanion
                     var steps = DailyPlan.Steps(s);
                     if (steps.Count == 0 || !HasPlan(steps)) { noPlan++; continue; }
 
-                    // 时间轴必须正好填满该时段（不定时的「合格线 / 说明」行不计）
+                    // 时间轴不能超出该时段（不定时的「合格线 / 说明」行不计）。
+                    // 短一点是允许的：原文没给够时长时，宁可提前几分钟结束，
+                    // 也不能去改作者写的数字。
                     int sum = 0;
                     foreach (var st in steps) if (!st.Head && !st.Untimed) sum += st.Minutes;
+                    bool over = sum > s.DurationMinutes;
                     bool ok = sum == s.DurationMinutes;
-                    if (!ok) bad++;
+                    if (over) bad++;
+                    else if (!ok) shortBy++;
 
                     // 步骤上的分钟数不能和正文里写的数字打架
                     // （正文写「（30 分钟）」步骤却显示 25′ —— 这正是要根除的毛病）
+                    bool shrunk = false;
                     foreach (var st in steps)
                     {
                         if (st.Head || st.Untimed) continue;
@@ -416,6 +422,44 @@ namespace StudyCompanion
                         if (mm > 0 && mm != st.Minutes) { clash++; if (clashSample.Length == 0)
                             clashSample = s.Start + "-" + s.End + " " + s.Subject + "：正文写 "
                                 + mm + "′，步骤显示 " + st.Minutes + "′ —— " + st.Text; }
+                        // 课表原文写的数字有没有被改掉（时段排不下时只能按比例缩）
+                        if (st.Raw.Length > 0)
+                        {
+                            int orig = DailyPlan.StatedMinutes(st.Raw);
+                            if (orig > 0 && orig != st.Minutes) { scaled++; shrunk = true; if (scaledSample.Length == 0)
+                                scaledSample = s.Start + "-" + s.End + " " + s.Subject
+                                    + "：原文 " + orig + "′ → 现在 " + st.Minutes + "′ —— " + st.Text; }
+                        }
+                    }
+                    if (shrunk) overSlots++;
+
+                    // 时钟必须首尾相接，并且正好收在时段结束那一刻。
+                    // 收尾逻辑改过分钟数之后如果忘了重排时钟，就会出现
+                    // 「20:05 起、28 分钟」的下一步却写着 20:32 这种错位。
+                    int clk = s.StartMinutes;
+                    foreach (var st in steps)
+                    {
+                        if (st.Head || st.Untimed) continue;
+                        if (st.Time != DailyPlan.Hhmm(clk)) { clkBad++; if (clkSample.Length == 0)
+                            clkSample = s.Start + "-" + s.End + " " + s.Subject + "：该 " + DailyPlan.Hhmm(clk)
+                                + " 却写 " + st.Time + " —— " + st.Text; }
+                        clk += st.Minutes;
+                    }
+                    // 时钟越过时段末尾才算错；提前结束是原文没写够时长，另算一类。
+                    if (clk > s.EndMinutes) { tailBad++; if (tailSample.Length == 0)
+                        tailSample = s.Start + "-" + s.End + " " + s.Subject + "：收在 "
+                            + DailyPlan.Hhmm(clk) + "，超出了 " + DailyPlan.Hhmm(s.EndMinutes); }
+
+                    // 全量转储：给外部检查脚本用（时间轴连续性、正文里的隐含时长等）
+                    dump.AppendLine("### " + d.ToString("yyyy-MM-dd") + " " + s.Start + "-" + s.End
+                        + "  " + s.Subject + "   时长 " + s.DurationMinutes + "′  合计 " + sum + "′  "
+                        + (ok ? "OK" : (over ? "超出 ✗" : "提前 " + (s.DurationMinutes - sum) + "′")));
+                    dump.AppendLine("  标题：" + (s.Title ?? ""));
+                    foreach (var st in steps)
+                    {
+                        if (st.Head) dump.AppendLine("  [" + st.Text + "]");
+                        else if (st.Untimed) dump.AppendLine("  ——       " + st.Text);
+                        else dump.AppendLine("  " + st.Time + " (" + st.Minutes + "′) " + st.Text);
                     }
 
                     if (samples.Count < 3 || !ok)
@@ -423,7 +467,7 @@ namespace StudyCompanion
                         var sb = new StringBuilder();
                         sb.AppendLine("### " + s.Start + "-" + s.End + "  " + s.Subject
                             + "   时长 " + s.DurationMinutes + "′  合计 " + sum + "′  "
-                            + (ok ? "OK" : "不匹配 ✗"));
+                            + (ok ? "OK" : (over ? "超出 ✗" : "提前 " + (s.DurationMinutes - sum) + "′")));
                         foreach (var st in steps)
                         {
                             if (st.Head) sb.AppendLine("  [" + st.Text + "]");
@@ -440,12 +484,22 @@ namespace StudyCompanion
             foreach (var t in samples) log.AppendLine(t);
             log.AppendLine();
             log.AppendLine("时段总数 = " + slots + "，其中无步骤 = " + noPlan
-                + "，时间轴不匹配 = " + bad);
+                + "，时间轴超出时段 = " + bad);
+            log.AppendLine("时间轴提前结束（原文没写够时长）= " + shortBy + " 个时段");
             log.AppendLine("分钟数与正文打架 = " + clash
                 + (clash > 0 ? "　（例：" + clashSample + "）" : ""));
+            log.AppendLine("时钟错位 = " + clkBad
+                + (clkBad > 0 ? "　（例：" + clkSample + "）" : ""));
+            log.AppendLine("时钟越过时段末尾 = " + tailBad
+                + (tailBad > 0 ? "　（例：" + tailSample + "）" : ""));
+            log.AppendLine("课表原文写死的分钟数被改掉 = " + scaled + " 处"
+                + (scaled > 0 ? "，涉及 " + overSlots + " 个时段"
+                    + "（原文写得比时段长，只能等比缩）" : ""));
 
             File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plantest.txt"),
                 log.ToString(), new UTF8Encoding(true));
+            File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plandump.txt"),
+                dump.ToString(), new UTF8Encoding(true));
             Console.WriteLine("plantest -> " + Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plantest.txt"));
         }
 

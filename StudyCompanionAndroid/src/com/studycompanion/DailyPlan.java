@@ -65,6 +65,11 @@ public class DailyPlan {
     static final Pattern RANGE_RE = Pattern.compile("^(\\d+)\\s*[–\\-~]\\s*(\\d+)$");
     static final Pattern DUR1 = Pattern.compile("(\\d+)\\s*[′'’]");
     static final Pattern DUR2 = Pattern.compile("(\\d+)\\s*分钟");
+    // 「每节 5 分钟」说的是**每小节**的时长，不是这一行的总时长。
+    // 课表里写「速览 §1.1…§1.4（每节 5 分钟）」= 4 节 ×5 分 = 20 分钟。
+    static final Pattern PER_RE = Pattern.compile("(?:每节|各|每个|每小块)\\s*(\\d+)\\s*分钟");
+    // 收尾后写回去的「共 N 分钟」——优先级最高，它就是这一行的总时长。
+    static final Pattern TOTAL_RE = Pattern.compile("共\\s*(\\d+)\\s*分钟");
 
     // ------------------------------------------------------------------ 加载
     public static synchronized void load(Context c) {
@@ -150,21 +155,62 @@ public class DailyPlan {
         return String.format("%02d:%02d", (total / 60) % 24, total % 60);
     }
 
-    /** 这一行正文里自己写了多少分钟（「（30 分钟）」「20′」）。没写就返回 0。 */
+    /**
+     * 只看第一个中文冒号之前的「标签段」。
+     * 比如 `✓ 合格线（自己判定）：复述能连续讲满 2 分钟…` 里的 2 分钟是要求，不是步骤时长；
+     * `③ 产出（30 分钟）：…听一段 5–8 分钟真讲座…` 里的 5–8 分钟是材料长度。
+     * 早先把整行都拿去搜数字，结果把 10/25/30/10 的 EAP 格子重算成 9/24/29/9，
+     * 正文里的数字也跟着被改 —— 看起来就是「时间和安排不符」。
+     */
+    static String labelOf(String text) {
+        if (text == null || text.length() == 0) return "";
+        int i = text.indexOf('\uFF1A');
+        return i > 0 ? text.substring(0, i) : text;
+    }
+
+    /** 这一行正文里自己写了多少分钟（「（30 分钟）」「20′」「每节 5 分钟」）。没写就返回 0。 */
     public static int statedMinutes(String text) {
         if (text == null || text.length() == 0) return 0;
-        Matcher m = DUR1.matcher(text);
+        String seg = labelOf(text);
+        Matcher tot = TOTAL_RE.matcher(seg);         // 已经写明了总数，以它为准
+        if (tot.find()) return parseInt(tot.group(1));
+        Matcher per = PER_RE.matcher(seg);           // 「每节 5 分钟」× 节数
+        if (per.find()) {
+            int n = parseInt(per.group(1));
+            int cnt = secListOf(seg).size();
+            if (cnt >= 1) return n * cnt;
+        }
+        Matcher m = DUR1.matcher(seg);
         boolean hit = m.find();
-        if (!hit) { m = DUR2.matcher(text); hit = m.find(); }
+        if (!hit) { m = DUR2.matcher(seg); hit = m.find(); }
         return hit ? parseInt(m.group(1)) : 0;
     }
 
     /** 把正文里那个分钟数换掉（跟 statedMinutes 认的是同一处数字）。 */
     public static String withMinutes(String text, int mm) {
         if (text == null || text.length() == 0) return text;
-        Matcher g = DUR1.matcher(text);
+        String seg = labelOf(text);
+        // 「每节 N 分钟」这种写法：N 是每节的量，不能直接改成总数。
+        Matcher per = PER_RE.matcher(seg);
+        if (per.find()) {
+            Matcher tot = TOTAL_RE.matcher(seg);
+            if (tot.find()) {
+                int a0 = tot.start(1), b0 = tot.end(1);
+                return text.substring(0, a0) + mm + text.substring(b0);
+            }
+            int n = parseInt(per.group(1));
+            int cnt = secListOf(seg).size();
+            if (cnt >= 1 && n * cnt != mm) {
+                // 时段排不下，已经按比例压缩过：这时「每节 5 分钟」和实际总量对不上，
+                // 与其留下「每节 5 分钟，共 16 分钟」这种自相矛盾，不如只留总量。
+                return text.substring(0, per.start()) + "共 " + mm + " 分钟"
+                        + text.substring(per.end());
+            }
+            return text.substring(0, per.end()) + "，共 " + mm + " 分钟" + text.substring(per.end());
+        }
+        Matcher g = DUR1.matcher(seg);
         boolean hit = g.find();
-        if (!hit) { g = DUR2.matcher(text); hit = g.find(); }
+        if (!hit) { g = DUR2.matcher(seg); hit = g.find(); }
         if (!hit) return text;
         int a = g.start(1), b = g.end(1);
         return text.substring(0, a) + mm + text.substring(b);
@@ -181,6 +227,15 @@ public class DailyPlan {
             if (!st.head && !st.untimed && st.raw.length() > 0)
                 st.text = withMinutes(st.raw, st.minutes);
         }
+        // fitTail 改过分钟数之后，时钟必须重排一遍 ——
+        // 否则会看到「20:05 起、28 分钟」的下一步却写着 20:32（该是 20:33）。
+        int cursor = s.startMin();
+        for (int i = 0; i < out.size(); i++) {
+            Step st = out.get(i);
+            if (st.head || st.untimed) continue;   // 不定时的行不走钟
+            st.time = hhmm(cursor);
+            cursor += st.minutes;
+        }
         return out;
     }
 
@@ -191,6 +246,9 @@ public class DailyPlan {
     // 收尾时的下限只保证「不是 0」：这里再用 3 分钟卡，
     // 就会出现「把所有步骤顶到 3 分钟、只能回头去砍课表原文写死的数字」的荒唐结果。
     static final int MIN_TAIL = 1;
+    // 没写时长的「说明行」至少要有这么多分钟才配拿到时间。
+    // 只分到 1–2 分钟毫无意义 ——「逐题批改 (1′)」比「——（属于上一步）」更容易让人误解。
+    static final int MIN_USEFUL = 3;
 
     static void fitTail(List<Step> out, com.studycompanion.ScheduleData.Slot s) {
         if (s == null || out.isEmpty()) return;
@@ -217,9 +275,8 @@ public class DailyPlan {
                 if (!out.get(idx.get(i).intValue()).fixed) flex++;
             }
             if (flex == 0) {
-                // 一个「程序算出来的」行都没有：只能加在最后一步上
-                int lastI = idx.get(idx.size() - 1).intValue();
-                out.get(lastI).minutes += diff;
+                // 定时行全是课表原文写死的：宁可让时段提前几分钟结束，
+                // 也不能去改作者写的数字。
                 return;
             }
             // 富余的时间平摊给「程序算出来的」那些行，免得全堆在最后一步上
@@ -377,10 +434,7 @@ public class DailyPlan {
         boolean[] fromText = new boolean[ds.size()];
         int fixedSum = 0, blanks = 0;
         for (int i = 0; i < ds.size(); i++) {
-            Matcher m = DUR1.matcher(ds.get(i));
-            boolean hit = m.find();
-            if (!hit) { m = DUR2.matcher(ds.get(i)); hit = m.find(); }
-            est[i] = hit ? parseInt(m.group(1)) : 0;
+            est[i] = statedMinutes(ds.get(i));
             if (est[i] > 0) { fromText[i] = true; fixedSum += est[i]; }
             else blanks++;
         }
@@ -396,11 +450,11 @@ public class DailyPlan {
                 if (est[i] > 0) fixedSum += est[i]; else blanks++;
             slack = total - fixedSum;
         }
-        if (blanks > 0 && slack > 0) {
+        if (blanks > 0 && slack / blanks >= MIN_USEFUL) {
             // 剩下的时间平摊给没写时长的行。这些行的正文里本来就没有数字，
             // 给多少都不会自相矛盾；但富余如果连 1 分钟都不够分，
             // 就只能让排在后面的那几行改成不定时，不能超支。
-            int per = Math.max(1, slack / blanks);
+            int per = slack / blanks;
             int given = 0;
             for (int i = 0; i < est.length; i++) {
                 if (est[i] != 0) continue;
@@ -408,6 +462,12 @@ public class DailyPlan {
                 est[i] = per;
                 given += per;
             }
+        } else if (blanks > 0 && slack >= MIN_USEFUL) {
+            // 平摊不够看（例如 3 行只摊到 5 分钟）：把这点余量整块给第一条说明行 ——
+            // 它通常紧跟在习题后面，是「逐题批改」这种真要吃时间的活。
+            // 这样时间轴照样收在时段末尾，又不会冒出 1–2 分钟的空步骤。
+            for (int i = 0; i < est.length; i++)
+                if (est[i] == 0) { est[i] = slack; break; }
         } else if (fixedSum == 0) {
             // 一行都没写时长：按行数平分
             int even = Math.max(MIN_MIN, total / Math.max(1, ds.size()));

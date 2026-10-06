@@ -25,6 +25,8 @@ StudyCompanion/selftest.txt
 StudyCompanion/closetest.txt
 StudyCompanion/layouttest.txt
 StudyCompanion/plantest.txt
+StudyCompanion/plandump.txt
+StudyCompanion/plancheck.txt
 StudyCompanion/_*.png
 StudyCompanion/_test/
 StudyCompanion/ghtest.exe
