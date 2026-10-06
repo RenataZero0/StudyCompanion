@@ -387,6 +387,7 @@ namespace StudyCompanion
 
             int slots = 0, bad = 0, noPlan = 0, clash = 0, clkBad = 0, tailBad = 0, shortBy = 0, scaled = 0, overSlots = 0;
             string clashSample = "", clkSample = "", tailSample = "", scaledSample = "";
+            var scaledList = new List<string>();
             var samples = new List<string>();
             var dump = new StringBuilder();
 
@@ -431,7 +432,10 @@ namespace StudyCompanion
                                     + "：原文 " + orig + "′ → 现在 " + st.Minutes + "′ —— " + st.Text; }
                         }
                     }
-                    if (shrunk) overSlots++;
+                    if (shrunk) { overSlots++;
+                        if (scaledList.Count < 60)
+                            scaledList.Add(dp.Date.ToString("yyyy-MM-dd") + "　" + s.Start + "-"
+                                + s.End + "　" + s.Subject + "　" + s.Title); }
 
                     // 时钟必须首尾相接，并且正好收在时段结束那一刻。
                     // 收尾逻辑改过分钟数之后如果忘了重排时钟，就会出现
@@ -495,6 +499,12 @@ namespace StudyCompanion
             log.AppendLine("课表原文写死的分钟数被改掉 = " + scaled + " 处"
                 + (scaled > 0 ? "，涉及 " + overSlots + " 个时段"
                     + "（原文写得比时段长，只能等比缩）" : ""));
+            if (scaledList.Count > 0)
+            {
+                log.AppendLine();
+                log.AppendLine("原文写得比时段长的时段（建议改课表）：");
+                foreach (var t in scaledList) log.AppendLine("  " + t);
+            }
 
             File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plantest.txt"),
                 log.ToString(), new UTF8Encoding(true));
