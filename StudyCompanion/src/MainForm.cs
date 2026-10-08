@@ -180,12 +180,33 @@ namespace StudyCompanion
 
         public static void OpenUrl(string url)
         {
+            if (TryOpen(url)) return;
+
+            // file:// 失败时兜底（2026-10-08：中文路径被百分号编码后，WPS 会报「系统找不到指定的文件」）
+            // ① 退回本地路径重新拼一次 URL（只转义空格，中文原样）；② 再直接打开本地文件（会丢 #page，但至少能打开）。
+            if (url.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+            {
+                string path = null;
+                try { path = new Uri(url).LocalPath; } catch { }
+                if (path != null)
+                {
+                    int hash = url.IndexOf('#');
+                    if (TryOpen(VideoLinks.FileUrl(path) + (hash >= 0 ? url.Substring(hash) : ""))) return;
+                    if (System.IO.File.Exists(path) && TryOpen(path)) return;
+                }
+            }
+            MessageBox.Show("无法打开链接：\n" + url, "提示");
+        }
+
+        static bool TryOpen(string target)
+        {
             try
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                { FileName = url, UseShellExecute = true });
+                { FileName = target, UseShellExecute = true });
+                return true;
             }
-            catch (Exception ex) { MessageBox.Show("无法打开链接：\n" + url + "\n\n" + ex.Message, "提示"); }
+            catch { return false; }
         }
 
         /// <summary>同步「完成」状态（不重建控件）</summary>

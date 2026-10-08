@@ -468,7 +468,7 @@ namespace StudyCompanion
                 if (page > 0 && book.Offset > 0) { pdfPage = page + book.Offset; secLabel = "p." + page; }
             }
 
-            string url = new Uri(book.Path).AbsoluteUri;
+            string url = FileUrl(book.Path);
             if (pdfPage > 0)
             {
                 url += "#page=" + pdfPage;
@@ -476,6 +476,21 @@ namespace StudyCompanion
             }
             else res.Add(R("打开课本 " + code, url));
             return res;
+        }
+
+        /// <summary>
+        /// 本地路径 -> 可以交给 ShellExecute 的 file:// URL。
+        /// ⚠ 不能用 new Uri(path).AbsoluteUri：它会把路径里的非 ASCII 字符百分号编码
+        ///   （…/02_%E5%AD%A6%E4%B9%A0%E4%B8%8E%E6%95%99%E6%9D%90/…），WPS 与 Windows shell
+        ///   拿到这种 URL 会直接报「系统找不到指定的文件」（2026-10-08 实测；纯 ASCII 路径正常）。
+        ///   实测：只把空格转成 %20、中文原样保留，WPS 能正常打开并跳到 #page=N。
+        /// </summary>
+        public static string FileUrl(string path)
+        {
+            string p = path.Replace('\\', '/');
+            p = p.StartsWith("//") ? "file:" + p : "file:///" + p.TrimStart('/');
+            // 先把 % 自身编码，避免路径里出现字面 % 时被当成转义序列
+            return p.Replace("%", "%25").Replace(" ", "%20").Replace("#", "%23");
         }
 
         // ------------------------------------------------------------------ 小节 -> PDF 页索引
