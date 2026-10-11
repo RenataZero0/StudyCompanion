@@ -327,8 +327,15 @@ public class MainView extends View {
         float total = Math.min(W - outer * 2, Ui.px(1180));
         boxX0 = Math.round((W - total) / 2f);
         boxX1 = boxX0 + total;
-        // 平板 / 横屏：左右两栏（与桌面版一致）；手机竖屏：单栏
-        boolean twoCol = total >= Ui.px(720);
+        // 平板：左右两栏（与桌面版一致）；手机：单栏 —— 横屏也不变。
+        //
+        // 判据必须用「设备的最短边」，不能用当前方向的宽度：
+        // 这台手机横屏是 785dp 宽 × 360dp 高，按宽度判（>=720）会当场变成两列平板布局，
+        // 于是 360dp 的高度要装下比屏幕还高的日历卡，底部横栏也会消失。
+        // 最短边则是设备固有属性，转不转屏都一样：手机 360dp、平板 800dp。
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        int minDp = Math.round(Math.min(dm.widthPixels, dm.heightPixels) / dm.density);
+        boolean twoCol = minDp >= 600;
 
         // 手机端：日历 / 统计 / 设置 挪到独立页面，主界面只留今天的任务
         if (overlay == 4) { drawPlanOverlay(c, W, H); return; }
