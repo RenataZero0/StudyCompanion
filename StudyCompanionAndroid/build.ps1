@@ -64,6 +64,22 @@ foreach ($n in @("exercises.tsv", "checks.tsv", "books.tsv")) {
 }
 Write-Host "plan tables: copied from ..\StudyCompanion\data\plan"
 
+# aapt2 packs the WHOLE assets\ directory, so anything left lying there goes into the
+# APK. A stray "Schedule.xlsx.bak-20261008-terms" (88 KB) once made the shipped APK
+# 362 KB instead of 274 KB. Whitelist the files that are actually meant to ship.
+$allowed = @("CHANGELOG.md", "Schedule.xlsx", "exercises.tsv", "checks.tsv", "books.tsv")
+$stray = @(Get-ChildItem $assetDst -File | Where-Object { $allowed -notcontains $_.Name })
+if ($stray.Count -gt 0) {
+    $names = ($stray | ForEach-Object { $_.Name }) -join ", "
+    throw "assets\ contains files that are not meant to ship: $names  (aapt2 packs the whole folder; move them out first)"
+}
+$subdir = @(Get-ChildItem $assetDst -Directory)
+if ($subdir.Count -gt 0) {
+    $names = ($subdir | ForEach-Object { $_.Name }) -join ", "
+    throw "assets\ contains subdirectories: $names  (aapt2 on Windows writes them with a backslash, which AssetManager cannot open)"
+}
+Write-Host "assets: whitelist OK ($($allowed.Count) files)"
+
 $out = "$here\build"
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
 New-Item -ItemType Directory -Force "$out\gen", "$out\classes", "$out\dex" | Out-Null
