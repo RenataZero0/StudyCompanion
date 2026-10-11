@@ -965,7 +965,8 @@ public class MainView extends View {
             h += Ui.px(22);
             h += buttonRows(g, avail, pBtn0) * (Ui.px(30) + Ui.px(8));
             for (int i = 1; i < g.length; i++)
-                if (g[i].startsWith("\u0001")) h += Ui.px(18);
+                if (g[i].startsWith("\u0001"))
+                    h += Ui.wrap(pNote, g[i].substring(1), avail).size() * Ui.px(18);
             h += Ui.px(10);
         }
         h += Ui.px(2);
@@ -1014,8 +1015,11 @@ public class MainView extends View {
             for (int i = 1; i < g.length; i++) {
                 String label = g[i];
                 if (!label.startsWith("\u0001")) continue;
-                Ui.text(c, label.substring(1), pad + Ui.px(16), cy + Ui.px(13), pNote);
-                cy += Ui.px(18);
+                // 说明行必须换行：平板上一般一行放得下，手机上 360dp 会直接冲出卡片右边缘
+                for (String nline : Ui.wrap(pNote, label.substring(1), avail)) {
+                    Ui.text(c, nline, pad + Ui.px(16), cy + Ui.px(13), pNote);
+                    cy += Ui.px(18);
+                }
             }
             cy += Ui.px(10);
         }

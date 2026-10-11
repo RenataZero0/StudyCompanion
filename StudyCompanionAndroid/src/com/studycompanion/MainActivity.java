@@ -790,7 +790,7 @@ public class MainActivity extends Activity implements MainView.Listener {
                 .setView(wrap)
                 .setMessage("程序自己不能翻墙，只能填你已经在用的代理。\n"
                         + "格式：主机:端口，例如 127.0.0.1:7890；留空 = 不用代理。\n\n"
-                        + "平板没装代理？在电脑上开 Clash，勾上「允许局域网连接」，"
+                        + "这台设备没装代理？在电脑上开 Clash，勾上「允许局域网连接」，"
                         + "这里填那台电脑的 IP，例如 192.168.1.5:7890。")
                 .setPositiveButton("保存", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
