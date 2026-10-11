@@ -439,17 +439,11 @@ public class DailyPlan {
             else blanks++;
         }
         int slack = total - fixedSum;
-        // 原文写的时长加起来比时段本身还长（课表排得太满）：按比例缩小。
-        // 用 floor 保证缩完不会又超出去；正文里的数字随后会跟着改成缩完的值。
-        if (fixedSum > total) {
-            double sc = total * 1.0 / fixedSum;
-            for (int i = 0; i < est.length; i++)
-                if (fromText[i]) est[i] = Math.max(1, (int) Math.floor(est[i] * sc));
-            fixedSum = 0; blanks = 0;
-            for (int i = 0; i < est.length; i++)
-                if (est[i] > 0) fixedSum += est[i]; else blanks++;
-            slack = total - fixedSum;
-        }
+        // 原文写的时长加起来比时段本身还长 —— **不再按比例缩小**。
+        // 2026-10-11 用户决定：保留课表原文的数字，宁可让时间轴溢出，也不要在程序里
+        // 偷偷把「30 分钟」改小成「25 分钟」——那等于篡改课表。
+        // 这类格子已经在排课端修掉了（EAP 补到 75′、格式训练不再把两节塞进一格）。
+        // 注意 slack 这时是负数，下面几个分支的 `>= MIN_USEFUL` 判断都会自然跳过。
         if (blanks > 0 && slack / blanks >= MIN_USEFUL) {
             // 剩下的时间平摊给没写时长的行。这些行的正文里本来就没有数字，
             // 给多少都不会自相矛盾；但富余如果连 1 分钟都不够分，

@@ -487,19 +487,12 @@ namespace StudyCompanion
                 else blanks++;
             }
 
-            // 原文写的时长加起来比时段本身还长（课表排得太满）：按比例缩小。
-            // 用 Floor 保证缩完不会又超出去；正文里的数字随后会跟着改成缩完的值。
-            if (fixedSum > total)
-            {
-                double sc = total * 1.0 / fixedSum;
-                for (int i = 0; i < own.Length; i++)
-                    if (fromText[i]) own[i] = Math.Max(1, (int)Math.Floor(own[i] * sc));
-                fixedSum = 0; blanks = 0;
-                for (int i = 0; i < own.Length; i++)
-                    if (own[i] > 0) fixedSum += own[i]; else blanks++;
-            }
-
-            int slack = total - fixedSum;
+            // 原文写的时长加起来比时段本身还长 —— **不再按比例缩小**。
+            // 2026-10-11 用户决定：保留课表原文的数字，宁可让时间轴溢出（后面几行会标出来），
+            // 也不要在程序里偷偷把「30 分钟」改小成「25 分钟」——那等于篡改课表。
+            // 这类格子已经在排课端修掉了（EAP 补到 75′、格式训练不再把两节塞进一格），
+            // 这里保留检测只为万一以后又出现：把差额记下来，交给 FitTail 之后的标记去提示。
+            int slack = total - fixedSum;   // 可能为负（原文比时段长）——下面几个分支都会自然跳过
             // 没写时长的行（「逐题批改」「做完对照答案」这类说明）只有在能分到
             // MinUseful 分钟以上时才给时间。只分到 1–2 分钟毫无意义 ——
             // 「逐题批改 (1′)」比「——（属于上一步）」更容易让人误解。
